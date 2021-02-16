@@ -1,0 +1,27 @@
+{
+  "name": "sealer",
+  "version": "1.0.0",
+  "description": "Attest property ownership",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/colaxalabs/sealer.git"
+  },
+  "author": "Edwin Lomolo",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/colaxalabs/sealer/issues"
+  },
+  "homepage": "https://github.com/colaxalabs/sealer#readme",
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.1",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "chai": "^4.3.0",
+    "ethereum-waffle": "^3.2.2",
+    "ethers": "^5.0.31",
+    "hardhat": "^2.0.10"
+  }
+}
