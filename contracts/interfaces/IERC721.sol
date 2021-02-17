@@ -89,7 +89,7 @@ interface IERC721 is IERC165 {
    *
    * - `tokenId` must exist.
    */
-  function getApproved(uint256 tokenId) external view returns (bool);
+  function getApproved(uint256 tokenId) external view returns (address);
 
   /**
    * @dev Approve or remove `operator` as an operator for the caller.
