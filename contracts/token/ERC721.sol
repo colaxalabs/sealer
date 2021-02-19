@@ -15,10 +15,6 @@ contract ERC721 is ERC165, IERC721 {
   mapping(address => uint256) private _balances;
   // Mapping token to their holder
   mapping(uint256 => address) private _tokenToHolder;
-  // Mapping token to approved address
-  mapping(uint256 => address) private _tokenApprovals;
-  // Mapping token owner to operator approval
-  mapping(address => mapping(address => bool)) private _operatorApprovals;
 
   /**
    * @dev Initalizes the contract by registering supported interfaces
@@ -57,59 +53,37 @@ contract ERC721 is ERC165, IERC721 {
   /**
    * @dev See {IERC721-approve}
    */
-  function approve(address to, uint256 tokenId) public override {
-    address owner = ERC721.ownerOf(tokenId);
-    require(to != owner, "ERC721: cannot approve to current owner");
-    require(msg.sender == owner || ERC721.isApprovedForAll(owner, msg.sender), "ERC721: caller is not owner or approved for all");
-    _approve(to, tokenId);
-  }
+  function approve(address to, uint256 tokenId) public override {}
 
   /**
    * @dev See {IERC721-getApproved}
    */
-  function getApproved(uint256 tokenId) public view override returns (address) {
-    require(_exists(tokenId), "ERC721: nonexistent token");
-    return _tokenApprovals[tokenId];
-  }
+  function getApproved(uint256 tokenId) public view override returns (address) {}
 
   /**
    * @dev See {IERC721-setApprovalForAll}
    */
-  function setApprovalForAll(address operator, bool approved) public override {
-    require(operator != msg.sender, "ERC721: cannot call approval to owner");
-    _operatorApprovals[msg.sender][operator] = approved;
-    emit ApprovalForAll(msg.sender, operator, approved);
-  }
+  function setApprovalForAll(address operator, bool approved) public override {}
 
   /**
    * @dev See {IERC721-isApprovedForAll}
    */
-  function isApprovedForAll(address owner, address operator) public view override returns (bool) {
-    return _operatorApprovals[owner][operator];
-  }
+  function isApprovedForAll(address owner, address operator) public view override returns (bool) {}
 
   /**
    * @dev See {IERC721-transferFrom}
    */
-  function transferFrom(address from, address to, uint256 tokenId) public override {
-    require(_isApprovedOrOwner(msg.sender, tokenId), "ERC721: caller is not owner or approval");
-    _transfer(from, to, tokenId);
-  }
+  function transferFrom(address from, address to, uint256 tokenId) public override {}
 
   /**
    * @dev See {IERC721-safeTransferFrom}
    */
-  function safeTransferFrom(address from, address to, uint256 tokenId) public override {
-    safeTransferFrom(from, to, tokenId, "");
-  }
+  function safeTransferFrom(address from, address to, uint256 tokenId) public override {}
 
   /**
    * @dev See {IERC721-safeTransferFrom}
    */
-  function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory _data) public override {
-    require(_isApprovedOrOwner(msg.sender, tokenId), "ERC721: caller is not owner or approval");
-    _safeTransfer(from, to, tokenId, _data);
-  }
+  function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory _data) public override {}
 
   /**
    * @dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients
@@ -129,10 +103,7 @@ contract ERC721 is ERC165, IERC721 {
    *
    * emits a {Transfer} event.
    */
-  function _safeTransfer(address from, address to, uint256 tokenId, bytes memory _data) internal {
-    _transfer(from, to, tokenId);
-    require(_checkOnERC721Received(from, to, tokenId, _data), "ERC721: transfer on non ERC721Receiver implementer");
-  }
+  function _safeTransfer(address from, address to, uint256 tokenId, bytes memory _data) internal {}
 
   /**
    * @dev Returns whether `tokenId` exists.
@@ -152,11 +123,7 @@ contract ERC721 is ERC165, IERC721 {
    *
    * - `tokenId` must exist.
    */
-  function _isApprovedOrOwner(address spender, uint256 tokenId) internal view returns (bool) {
-    require(_exists(tokenId), "ERC721: nonexistent token");
-    address owner = ERC721.ownerOf(tokenId);
-    return (spender == owner || getApproved(tokenId) == spender || ERC721.isApprovedForAll(owner, spender));
-  }
+  function _isApprovedOrOwner(address spender, uint256 tokenId) internal view returns (bool) {}
 
   /**
    * @dev Safely mints `tokenId` and transfers it to `to`.
@@ -213,20 +180,7 @@ contract ERC721 is ERC165, IERC721 {
    *
    * emits a {Transfer} event.
    */
-  function _transfer(address from, address to, uint256 tokenId) internal {
-    require(ERC721.ownerOf(tokenId) == from, "ERC721: cannot transfer token that is not own"); // internal owner
-    require(to != address(0), "ERC721: cannot transfer to zero address");
-    _beforeTokenTransfer(from, to, tokenId);
-
-    // Clear approval from the previous owner
-    _approve(address(0), tokenId);
-
-    // Change ownership
-
-    // Update to new balances
-
-    emit Transfer(from, to, tokenId);
-  }
+  function _transfer(address from, address to, uint256 tokenId) internal {}
 
   /**
    * @dev Internal function to invoke {IERC721Receiver-onERC721Received} on a target address.
@@ -256,10 +210,7 @@ contract ERC721 is ERC165, IERC721 {
     }
   }
 
-  function _approve(address to, uint256 tokenId) private {
-    _tokenApprovals[tokenId] = to;
-    emit Approval(ERC721.ownerOf(tokenId), to, tokenId); // internal owner
-  }
+  function _approve(address to, uint256 tokenId) private {}
 
   /**
    * @dev Hook that is called before any token transfer. This includes minting
