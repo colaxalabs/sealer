@@ -27,7 +27,7 @@ contract ERC721 is ERC165, IERC721 {
   /**
    * @dev See {IERC721-balanceOf}
    */
-  function balanceOf(address who) public view override returns (uint256) {
+  function balanceOf(address who) external view override returns (uint256) {
     require(who != address(0), "ERC721: balance query for zero address");
     return _balances[who];
   }
@@ -35,7 +35,7 @@ contract ERC721 is ERC165, IERC721 {
   /**
    * @dev See {IERC721-ownerOf}
    */
-  function ownerOf(uint256 tokenId) public view override returns (address) {
+  function ownerOf(uint256 tokenId) external view override returns (address) {
     require(_exists(tokenId), "ERC721: nonexistent token");
     return _tokenToHolder[tokenId];
   }
@@ -43,7 +43,7 @@ contract ERC721 is ERC165, IERC721 {
   /**
    * @dev Return token at the specified holder index
    */
-  function tokenOfOwnerByIndex(address owner, uint256 index) public view returns (uint256) {
+  function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256) {
     require(owner != address(0), "ERC721:owner cannot be zero address");
     require(_balances[owner] > 0, "ERC721: cannot query zero token");
     require(index <= _balances[owner], "ERC721: index out of range");
@@ -53,37 +53,37 @@ contract ERC721 is ERC165, IERC721 {
   /**
    * @dev See {IERC721-approve}
    */
-  function approve(address to, uint256 tokenId) public override {}
+  function approve(address to, uint256 tokenId) external override {}
 
   /**
    * @dev See {IERC721-getApproved}
    */
-  function getApproved(uint256 tokenId) public view override returns (address) {}
+  function getApproved(uint256 tokenId) external view override returns (address) {}
 
   /**
    * @dev See {IERC721-setApprovalForAll}
    */
-  function setApprovalForAll(address operator, bool approved) public override {}
+  function setApprovalForAll(address operator, bool approved) external override {}
 
   /**
    * @dev See {IERC721-isApprovedForAll}
    */
-  function isApprovedForAll(address owner, address operator) public view override returns (bool) {}
+  function isApprovedForAll(address owner, address operator) external view override returns (bool) {}
 
   /**
    * @dev See {IERC721-transferFrom}
    */
-  function transferFrom(address from, address to, uint256 tokenId) public override {}
+  function transferFrom(address from, address to, uint256 tokenId) external override {}
 
   /**
    * @dev See {IERC721-safeTransferFrom}
    */
-  function safeTransferFrom(address from, address to, uint256 tokenId) public override {}
+  function safeTransferFrom(address from, address to, uint256 tokenId) external override {}
 
   /**
    * @dev See {IERC721-safeTransferFrom}
    */
-  function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory _data) public override {}
+  function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory _data) external override {}
 
   /**
    * @dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients
@@ -164,8 +164,11 @@ contract ERC721 is ERC165, IERC721 {
     require(to != address(0), "ERC721: cannot mint to zero address");
     require(!_exists(tokenId), "ERC721: token already minted");
     _beforeTokenTransfer(address(0), to, tokenId);
+    // Count tokens for holder
     _balances[to] = _balances[to] + 1;
+    // Index tokenId to owner token holder
     _holderToken[to][_balances[to]] = tokenId;
+    // Map tokenId to owner
     _tokenToHolder[tokenId] = to;
   }
 
