@@ -9,10 +9,15 @@ task('sealer:deploy', 'Deploy sealer contracts').setAction(
     const deployer = (await bre.ethers.getSigners())[0]
 
     // deploy ERC721
-    const registry = await(
+    const erc721 = await(
       await bre.ethers.getContractFactory('ERC721')
     ).deploy()
+    console.log(`ERC721 deployed at ${erc721.address}`)
 
-    console.log(`ERC721 deployed at ${registry.address}`)
+    // deploy Registry
+    const registry = await (
+      await bre.ethers.getContractFactory('Registry')
+    ).deploy(erc721.address)
+    console.log(`Registry deployed at ${registry.address}`)
   }
 )
