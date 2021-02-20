@@ -9,4 +9,7 @@ export default {
   solidity: {
     version: "0.8.0",
   },
+  mocha: {
+    timeout: 100000,
+  },
 } as HardhatUserConfig;
