@@ -3,7 +3,6 @@
 pragma solidity ^0.8.0;
 
 import "../token/ERC721.sol";
-import "hardhat/console.sol";
 
 contract Registry {
   // NFT contract(tokenized farms)
@@ -34,7 +33,6 @@ contract Registry {
    * @return uint256
    */
   function farmCount(address who) external view returns (uint256) {
-    console.log(nftContract.balanceOf(who));
     return nftContract.balanceOf(who);
   }
 }

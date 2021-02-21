@@ -36,14 +36,12 @@ describe('Registry:Initialization', () => {
   })
 
   it('Should get total farms for an account', async() => {
-/*
- *    const user1 = accounts[2]
- *    const user2 = accounts[3]
- *    const totals1 = await registry.farmCount(user1)
- *    const totals2 = await registry.farmCount(user2)
- *
- *    expect(totals1).to.equal(0)
- *    expect(totals2).to.equal(0)
- */
+    const user1 = accounts[2].getAddress()
+    const user2 = accounts[3].getAddress()
+    const totals1 = await registry.farmCount(user1)
+    const totals2 = await registry.farmCount(user2)
+
+    expect(totals1).to.equal(0)
+    expect(totals2).to.equal(0)
   })
 })
