@@ -135,7 +135,7 @@ contract ERC721 is ERC165, IERC721 {
    *
    * emits a {Transfer} event.
    */
-  function _safeMint(address to, uint256 tokenId) internal {
+  function _safeMint(address to, uint256 tokenId) public {
     _safeMint(to, tokenId, "");
   }
 

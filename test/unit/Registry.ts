@@ -2,6 +2,8 @@ import { ethers } from 'hardhat'
 import { Signer, Contract } from 'ethers'
 const { expect } = require('chai')
 
+const zero = ethers.BigNumber.from(0)
+
 let accounts: Signer[],
   registry: Contract,
   token: Contract
@@ -32,16 +34,16 @@ describe('Registry:Initialization', () => {
   it('Should get total farms registered', async() => {
     const totals = await registry.totalFarms()
 
-    expect(totals).to.equal(0)
+    expect(totals).to.equal(zero)
   })
 
   it('Should get total farms for an account', async() => {
-    const user1 = accounts[2].getAddress()
-    const user2 = accounts[3].getAddress()
-    const totals1 = await registry.farmCount(user1)
-    const totals2 = await registry.farmCount(user2)
-
-    expect(totals1).to.equal(0)
-    expect(totals2).to.equal(0)
+    expect(await registry.landCount(await accounts[2].getAddress())).to.eq(zero)
   })
+})
+
+describe('Registry:Attest Property', () => {
+  before('setup Registry contract', setupContract)
+
+  it('Should attest title property and emit Attestation event', async() => {})
 })
