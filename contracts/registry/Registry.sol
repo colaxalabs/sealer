@@ -8,15 +8,17 @@ import "hardhat/console.sol";
 contract Registry {
   // @dev Emit Attestation after successful registration
   event Attestation(
+    uint256 _tokenId,
     string _title,
     string _documentHash,
     uint256 _size,
     string _unit,
-    address _signer
+    address indexed _signer
   );
 
   // @dev Land structure
   struct Land {
+    uint256 tokenId;
     string title;
     string titleDocument;
     uint256 size;
@@ -75,16 +77,18 @@ contract Registry {
     _nonce[keccak256(abi.encode(documentHash))] = true;
 
     // Recreate message signed off-chain by signer
-    bytes32 payloadHash = keccak256(abi.encode(tokenId, title, documentHash, size, unit));
-    bytes32 message = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash));
+    bytes32 message = recreateMessage(tokenId, title, documentHash, size, unit);
     // Authenticate message
     require(recover(message, attestor) == msg.sender, "REGISTRY: cannot authenticate signer");
     // Recover signer of the message
     address signer = recover(message, attestor);
     // Mint tokenId
     nftContract._safeMint(signer, tokenId);
+    _registryToId[title] = tokenId; // reference title to minted tokenID
+    _totalFarms += 1;
     // Store land structure
     _titleLand[title] = Land({
+      tokenId: tokenId,
       title: title,
       titleDocument: documentHash,
       size: size,
@@ -92,6 +96,7 @@ contract Registry {
       attestor: signer
     });
     emit Attestation(
+      tokenId,
       title,
       documentHash,
       size,
@@ -102,11 +107,45 @@ contract Registry {
 
   /**
    * @notice Claim ownership to land title
-   * @dev Get owner of the land title
+   * @dev Check if signer is the owner of the property in title
    * @param title Title of the land(use to recreate message signed off-chain on-chain)
    * @param signature Signature of the claimer
+   * return bool
    */
-  function claimOwnership(string memory title, bytes memory signature) external {}
+  function claimOwnership(string memory title, bytes memory signature) external view returns (bool) {
+    require(_registryToId[title] != 0, "REGISTRY: nonexistent title");
+    // get property details
+    Land storage _land = _titleLand[title];
+    bytes32 payloadHash = keccak256(abi.encode(title));
+    bytes32 message = prefixed(payloadHash);
+    return (recover(message, signature) == _land.attestor) && (payloadHash == keccak256(abi.encode(_land.title)));
+  }
+
+  /**
+   * @notice Recreate message signed off-chain by property owner
+   * @dev Return bytes32 of the land title data parameters signed off-chain
+   * @param tokenId To-be-Tokenized property ID
+   * @param title Land title
+   * @param documentHash Document hash of the land title
+   * @param size Size of the land
+   * @param unit Size unit of the land
+   * @return bytes32
+   */
+  function recreateMessage(uint256 tokenId, string memory title, string memory documentHash, uint256 size, string memory unit) internal pure returns (bytes32) {
+    // hash message parameters
+    bytes32 payloadHash = keccak256(abi.encode(tokenId, title, documentHash, size, unit));
+    // replay eth_sign on-chain
+    bytes32 message = prefixed(payloadHash);
+    return message;
+  }
+
+  /**
+   * @notice Prefix message sign with 'Ethereum Signed Message'
+   * @dev Replays eth_sign mechanism
+   */
+  function prefixed(bytes32 hash) internal pure returns (bytes32) {
+    return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash));
+  }
 
   /**
    * @notice Split signer from signature
