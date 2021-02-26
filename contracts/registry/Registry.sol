@@ -75,25 +75,26 @@ contract Registry {
     _nonce[keccak256(abi.encode(documentHash))] = true;
 
     // Recreate message signed off-chain by signer
-    bytes32 message = prefixed(keccak256(abi.encode(tokenId, title, documentHash, size, unit)));
+    bytes32 payloadHash = keccak256(abi.encode(tokenId, title, documentHash, size, unit));
+    bytes32 message = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash));
     // Authenticate message
-    //require(whoIsSigner(message, attestor) == msg.sender, "REGISTRY: cannot authenticate signer");
+    require(recover(message, attestor) == msg.sender, "REGISTRY: cannot authenticate signer");
     // Recover signer of the message
-    address signer = whoIsSigner(message, attestor);
+    address signer = recover(message, attestor);
     // Mint tokenId
     nftContract._safeMint(signer, tokenId);
     // Store land structure
     _titleLand[title] = Land({
       title: title,
       titleDocument: documentHash,
-      size: size * 10 ** 18,
+      size: size,
       unit: unit,
       attestor: signer
     });
     emit Attestation(
       title,
       documentHash,
-      size * 10 ** 18,
+      size,
       unit,
       signer
     );
@@ -108,17 +109,12 @@ contract Registry {
   function claimOwnership(string memory title, bytes memory signature) external {}
 
   /**
-   * @notice Build off-chain signed message hash
-   * @dev Return prefixed hash to mimic eth_sign behavior
+   * @notice Split signer from signature
    */
-  function prefixed(bytes32 hash) internal pure returns (bytes32) {
-    return keccak256(abi.encode("\x19Ethereum Signed Message:\n32", hash));
-  }
-
-  /**
-   * @notice Split signer signature
-   */
-  function splitSignature(bytes memory sig) internal pure returns (uint8 v, bytes32 r, bytes32 s) {
+  function recover(bytes32 message, bytes memory sig) internal pure returns (address) {
+    bytes32 r;
+    bytes32 s;
+    uint8 v;
     require(sig.length == 65, "REGISTRY: invalid signature to split");
     // Split signature
     assembly {
@@ -129,18 +125,16 @@ contract Registry {
       // final byte (first byte of the next 32 bytes)
       v := byte(0, mload(add(sig, 96)))
     }
-    return (v, r, s);
-  }
 
-  /**
-   * @notice Recover signer from message
-   * @dev Recover signer from signature
-   * @param message Message signed by signer
-   * @param sig Signature of the signer
-   */
-  function whoIsSigner(bytes32 message, bytes memory sig) internal pure returns (address) {
-    (uint8 v, bytes32 r, bytes32 s) = splitSignature(sig);
+    if (v < 27) {
+      v += 27;
+    }
 
-    return ecrecover(message, v, r, s);
+    if (v != 27 && v != 28) {
+      return address(0);
+    } else {
+      return ecrecover(message, v, r, s);
+    }
+
   }
 }
