@@ -2,7 +2,10 @@ import { ethers } from 'hardhat'
 import { Signer, Contract } from 'ethers'
 const { expect } = require('chai')
 
-const zero = ethers.BigNumber.from(0)
+const zero = ethers.constants.Zero
+const tokenId = 32012223
+const abiCoder = ethers.utils.defaultAbiCoder
+const size = ethers.utils.parseUnits('0.35', 18)
 
 let accounts: Signer[],
   registry: Contract,
@@ -45,5 +48,23 @@ describe('Registry:Initialization', () => {
 describe('Registry:Attest Property', () => {
   before('setup Registry contract', setupContract)
 
-  it('Should attest title property and emit Attestation event', async() => {})
+  it('Should attest title property and emit Attestation event', async() => {
+    // encode property data for signing
+    const payload = abiCoder.encode(
+      ['uint', 'string', 'string', 'uint', 'string'],
+      [tokenId,  '111/v0/43x/50300', 'QmUfideC1r5JhMVwgd8vjC7DtVnXw3QGfCSQA7fUVHK789', size, 'ha']
+    )
+    // hash payload
+    const payloadHash = ethers.utils.keccak256(payload)
+    // sign encoded property data
+    // generate 32 bytes of data as Uint8Array
+    const payloadMessage = ethers.utils.arrayify(payloadHash)
+    const attestor = await accounts[2].signMessage(payloadMessage)
+    // recover signer
+    const sig = ethers.utils.splitSignature(attestor)
+    const signer = ethers.utils.verifyMessage(payloadMessage, sig)
+    await expect(registry.connect(accounts[2]).attestProperty(tokenId,  '111/v0/43x/50300', 'QmUfideC1r5JhMVwgd8vjC7DtVnXw3QGfCSQA7fUVHK789', size, 'ha', attestor)).to.emit(registry, 'Attestation').withArgs('111/v0/43x/50300', 'QmUfideC1r5JhMVwgd8vjC7DtVnXw3QGfCSQA7fUVHK789', size, 'ha', signer) 
+  })
+
+  it('Should not attest duplicate property', async() => {})
 })

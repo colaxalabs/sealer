@@ -3,7 +3,7 @@ import { Signer, Contract } from 'ethers'
 import { expect } from 'chai'
 
 const zeroAddress = ethers.constants.AddressZero
-const zeroBalance = ethers.BigNumber.from(0)
+const zeroBalance = ethers.constants.Zero
 
 let accounts: Signer[],
   token: Contract
