@@ -1,8 +1,9 @@
 import { ethers } from 'hardhat'
-import { Signer, Contract } from 'ethers'
+import { Signer, Contract, BigNumberish } from 'ethers'
 const { expect } = require('chai')
 
 const zero = ethers.constants.Zero
+const addressZero = ethers.constants.AddressZero
 const tokenId = 32012223
 const tokenId2 = 431293
 const ipfsHash = 'QmUfideC1r5JhMVwgd8vjC7DtVnXw3QGfCSQA7fUVHK789'
@@ -12,6 +13,10 @@ const title = '111/v0/43x/50300'
 const title2 = '111/v0/43x/4932'
 const abiCoder = ethers.utils.defaultAbiCoder
 const size = ethers.utils.parseUnits('0.35', 18)
+const tenantSize = ethers.utils.parseUnits('0.15', 18)
+const overSize = ethers.utils.parseUnits('0.50', 18)
+const cost = ethers.utils.parseUnits('0.75', 18)
+const currentDateForwardADay = Math.floor(Date.now() / 1000) + 86400
 
 let accounts: Signer[],
   registry: Contract,
@@ -63,6 +68,25 @@ async function registerProperty(id: number, hash: string) {
     'ha',
     signer
   )
+}
+
+async function sealAgreement(purpose: string, tenantSize: BigNumberish, duration: number, cost: BigNumberish, titleNo: string) {
+  // encode agreement params
+  const payload = abiCoder.encode(
+    ['string', 'uint', 'uint', 'uint', 'string'],
+    [purpose, tenantSize, duration, cost, titleNo]
+  )
+  const payloadHash = ethers.utils.keccak256(payload)
+  // Sign encoded agreement
+  // generate 32 bytes of data as Uint8Array
+  const payloadMessage = ethers.utils.arrayify(payloadHash)
+  const ownerSign = await accounts[2].signMessage(payloadMessage)
+  const tenantSign = await accounts[3].signMessage(payloadMessage)
+  // recover tenant and signer
+  const tenantSig = ethers.utils.splitSignature(tenantSign)
+  const tenant = ethers.utils.verifyMessage(payloadMessage, tenantSig)
+  const owner = ethers.utils.verifyMessage(payloadMessage, ownerSign)
+  return { ownerSign, tenantSign }
 }
 
 describe("Registry", () => {
@@ -176,5 +200,51 @@ describe('Registry:Claim Ownership', () => {
         attestor
       )
     ).to.be.revertedWith('REGISTRY: nonexistent title')
+  })
+})
+
+describe('Registry:Agreement#totalPrevAgreements', () => {
+
+  before('setup Registry contract', setupContract);
+
+  it('Should revert getting previous agreements for account with zero address', async() => {
+    await expect(registry.totalPrevAgreements(addressZero)).to.be.revertedWith('REGISTRY: zero address')
+  })
+
+  it('Should get total previous agreement for an account', async() => {
+    const who = await accounts[2].getAddress()
+    expect(await registry.totalPrevAgreements(who)).to.eq(zero)
+  })
+})
+
+describe('Registry:Agreement#agreementAt', () => {
+
+  before('setup Registry contract', setupContract)
+
+  it('Should revert query agreement for zero address', async() => {
+    await expect(registry.agreementAt(addressZero, 0)).to.be.revertedWith('REGISTRY: zero address')
+  })
+
+  it('Should revert query agreement for index gt current total previous agreements', async() => {
+    const who = await accounts[3].getAddress()
+    await expect(registry.agreementAt(who, 1)).to.be.revertedWith('REGISTRY: index out of range')
+  })
+
+  it('Should get previous agreement for an account at an index correctly', async() => {
+    const who = await accounts[4].getAddress()
+    const resp = await registry.agreementAt(who, 0) // returns a tuple of values
+    expect(resp.length).to.eq(7)
+    expect(resp[1].toNumber()).to.eq(0)
+  })
+})
+
+describe('Registry:Agreement#sealAgreement', () => {
+
+  before('setup Registry contract', setupContract)
+
+  it('Should revert sealing agreement with invalid property title', async() => {
+    await registerProperty(tokenId2, ipfsHash2)
+    const { ownerSign, tenantSign } = await sealAgreement('Avocado', tenantSize, currentDateForwardADay, cost, title2)
+    await expect(registry.sealAgreement('Avocado farm', tenantSize, currentDateForwardADay, cost, title2, ownerSign, tenantSign)).to.be.revertedWith('REGISTRY: nonexistent titl')
   })
 })
