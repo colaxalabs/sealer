@@ -29,7 +29,7 @@ contract Registry {
   // NFT contract(tokenized lands)
   ERC721 private nftContract;
   // @dev Total number of tokenized lands
-  uint256 private _totalFarms;
+  uint256 private _totalLands;
   // Mapping titleNo/regNo to tokenId
   mapping(string => uint256) private _registryToId;
   // Mapping used title documents
@@ -50,8 +50,8 @@ contract Registry {
    * @dev Return total tokenized lands
    * @return uint256
    */
-  function totalFarms() external view returns (uint256) {
-    return _totalFarms;
+  function totalLands() external view returns (uint256) {
+    return _totalLands;
   }
 
   /**
@@ -85,7 +85,7 @@ contract Registry {
     // Mint tokenId
     nftContract._safeMint(signer, tokenId);
     _registryToId[title] = tokenId; // reference title to minted tokenID
-    _totalFarms += 1;
+    _totalLands += 1;
     // Store land structure
     _titleLand[title] = Land({
       tokenId: tokenId,
