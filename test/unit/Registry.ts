@@ -78,7 +78,7 @@ describe('Registry:Initialization', () => {
   before('setup Registry contract', setupContract)
 
   it('Should get total farms registered', async() => {
-    const totals = await registry.totalFarms()
+    const totals = await registry.totalLands()
 
     expect(totals).to.equal(zero)
   })
