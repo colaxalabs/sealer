@@ -142,10 +142,11 @@ contract Registry {
    */
   function claimOwnership(string memory title, bytes memory signature) external view returns (bool) {
     require(_registryToId[title] != 0, "REGISTRY: nonexistent title");
-    // get property details
-    Land storage _land = _titleLand[title];
     bytes32 payloadHash = keccak256(abi.encode(title));
     bytes32 message = prefixed(payloadHash);
+    require(whoIsSigner(message, signature) == msg.sender, 'cannot authenticate claimer');
+    // get property details
+    Land storage _land = _titleLand[title];
     return (whoIsSigner(message, signature) == _land.attestor) && (payloadHash == keccak256(abi.encode(_land.title)));
   }
 
@@ -284,14 +285,14 @@ contract Registry {
       bytes memory ownerSign,
       bytes memory tenantSign
     ) external {
-      require(_registryToId[titleNo] != 0, 'REGISTRY: nonexistent title');
-      require(size <= _titleLand[titleNo].size, 'REGISTRY: size out of range');
+      require(_registryToId[titleNo] != 0);
+      require(size <= _titleLand[titleNo].size);
+      require(duration > _agreements[msg.sender].duration && _agreements[msg.sender].cost == 0, 'latest running agreement');
       address owner = nftContract.ownerOf(_registryToId[titleNo]); // get owner of the tokenized title
       bytes32 message = recreateAgreementMessage(purpose, size, duration, cost, titleNo); // recreate message signed off-chain
-      require(whoIsSigner(message, ownerSign) == owner, 'REGISTRY: invalid owner signature');
-      address tenant = whoIsSigner(message, tenantSign); // get tenant from signature
-      require(_agreements[tenant].duration == 0 && _agreements[tenant].cost == 0, 'REGISTRY: latest running agreement');
-      _agreements[tenant] = Agreement({
+      require(whoIsSigner(message, ownerSign) == owner, 'invalid owner signature');
+      require(whoIsSigner(message, tenantSign) == msg.sender, 'cannot authenticate tenant');
+      _agreements[msg.sender] = Agreement({
         purpose: purpose,
         size: size,
         duration: duration,
@@ -300,7 +301,7 @@ contract Registry {
         tenantSignature: tenantSign,
         titleNo: titleNo
       });
-      Agreement storage seal = _agreements[tenant];
+      Agreement storage seal = _agreements[msg.sender];
       emit Sealed(
         seal.purpose,
         seal.size,
