@@ -15,8 +15,10 @@ const abiCoder = ethers.utils.defaultAbiCoder
 const size = ethers.utils.parseUnits('0.35', 18)
 const tenantSize = ethers.utils.parseUnits('0.15', 18)
 const overSize = ethers.utils.parseUnits('0.50', 18)
-const cost = ethers.utils.parseUnits('0.75', 18)
-const currentDateForwardADay = Math.floor(Date.now() / 1000) + 86400
+const cost = ethers.utils.parseUnits('250.75', 18)
+const rentDuration = Math.floor(Date.now() / 1000) + (86400 * 14)
+const restrictedDuration = Math.floor(Date.now() / 1000) - (86400 * 13)
+const rentPurpose = 'Avocado season planting'
 
 let accounts: Signer[],
   registry: Contract,
@@ -33,60 +35,71 @@ async function setupContract() {
   registry = await Registry.deploy(token.address)
 }
 
-async function registerProperty(id: number, hash: string) {
+async function signProperty(
+  _token: number,
+  _title: string,
+  _docHash: string,
+  _size: BigNumberish,
+  _unit: string,
+  _signer: Signer
+) {
   // encode property data for signing
   const payload = abiCoder.encode(
     ['uint', 'string', 'string', 'uint', 'string'],
-    [id,  title, hash, size, 'ha']
+    [_token,  _title, _docHash, _size, _unit]
   )
   // hash payload
   const payloadHash = ethers.utils.keccak256(payload)
   // sign encoded property data
   // generate 32 bytes of data as Uint8Array
   const payloadMessage = ethers.utils.arrayify(payloadHash)
-  const attestor = await accounts[2].signMessage(payloadMessage)
+  const attestor = await _signer.signMessage(payloadMessage)
   // recover signer
   const sig = ethers.utils.splitSignature(attestor)
   const signer = ethers.utils.verifyMessage(payloadMessage, sig)
-  await expect(
-    registry.connect(accounts[2]).attestProperty(
-      id,
-      title,
-      hash,
-      size,
-      'ha',
-      attestor
-    )
-  ).to.emit(
-    registry,
-    'Attestation'
-  ).withArgs(
-    id,
-    title,
-    hash,
-    size,
-    'ha',
-    signer
-  )
+  return { attestor, signer }
 }
 
-async function sealAgreement(purpose: string, tenantSize: BigNumberish, duration: number, cost: BigNumberish, titleNo: string) {
-  // encode agreement params
+async function signClaim(titleNo: string, signer: Signer) {
+  // encode payload
+  const payload = abiCoder.encode(['string'], [titleNo])
+  // hash payload
+  const payloadHash = ethers.utils.keccak256(payload)
+  // convert 32 bytes hash to Uint8Array
+  const payloadMessage = ethers.utils.arrayify(payloadHash)
+  // sign payload message
+  const claimer = await signer.signMessage(payloadMessage)
+  return claimer
+}
+
+async function ownerSignsAgreement(purposeForRent: string, rentSize: BigNumberish, duration: number, durationCost: BigNumberish, titleNo: string, owner: Signer) {
+  // encode payload
   const payload = abiCoder.encode(
     ['string', 'uint', 'uint', 'uint', 'string'],
-    [purpose, tenantSize, duration, cost, titleNo]
+    [purposeForRent, rentSize, duration, durationCost, titleNo]
   )
+  // hash payload
   const payloadHash = ethers.utils.keccak256(payload)
-  // Sign encoded agreement
-  // generate 32 bytes of data as Uint8Array
+  // convert payload 32 bytes hash to Uint8Array
   const payloadMessage = ethers.utils.arrayify(payloadHash)
-  const ownerSign = await accounts[2].signMessage(payloadMessage)
-  const tenantSign = await accounts[3].signMessage(payloadMessage)
-  // recover tenant and signer
-  const tenantSig = ethers.utils.splitSignature(tenantSign)
-  const tenant = ethers.utils.verifyMessage(payloadMessage, tenantSig)
-  const owner = ethers.utils.verifyMessage(payloadMessage, ownerSign)
-  return { ownerSign, tenantSign }
+  // owner signature
+  const ownerSign = await owner.signMessage(payloadMessage)
+  return ownerSign
+}
+
+async function tenantSignsAgreement(purposeForRent: string, rentSize: BigNumberish, duration: number, durationCost: BigNumberish, titleNo: string, tenant: Signer) {
+  // encode payload
+  const payload = abiCoder.encode(
+    ['string', 'uint', 'uint', 'uint', 'string'],
+    [purposeForRent, rentSize, duration, durationCost, titleNo]
+  )
+  // hash payload
+  const payloadHash = ethers.utils.keccak256(payload)
+  // convert payload 32 bytes hash to Uint8Array
+  const payloadMessage = ethers.utils.arrayify(payloadHash)
+  // tenant signature
+  const tenantSign = await tenant.signMessage(payloadMessage)
+  return tenantSign
 }
 
 describe("Registry", () => {
@@ -116,41 +129,64 @@ describe('Registry:Attest Property', () => {
   before('setup Registry contract', setupContract)
 
   it('Should attest title property and emit Attestation event', async() => {
-    await registerProperty(tokenId, ipfsHash) 
+    const { attestor, signer } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2]) 
+    await expect(
+      registry.connect(accounts[2]).attestProperty(
+        tokenId,
+        title,
+        ipfsHash,
+        size,
+        'ha',
+        attestor
+      )
+    ).to.emit(
+      registry,
+      'Attestation'
+    ).withArgs(
+      tokenId,
+      title,
+      ipfsHash,
+      size,
+      'ha',
+      signer
+    )
   })
 
   it('Should not attest duplicate property', async() => {
+    const { attestor, signer } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2]) 
     await expect(
-      registerProperty(tokenId, ipfsHash)
+      registry.connect(accounts[2]).attestProperty(
+        tokenId,
+        title,
+        ipfsHash,
+        size,
+        'ha',
+        attestor
+      )
     ).to.be.revertedWith('REGISTRY: duplicate title document')
   })
 
   it('Should not attest duplicate property tokenId', async() => {
+    const { attestor, signer } = await signProperty(tokenId, title2, ipfsHash2, size, 'ha', accounts[2]) 
     await expect(
-      registerProperty(tokenId, ipfsHash2)
+      registry.connect(accounts[2]).attestProperty(
+        tokenId,
+        title2,
+        ipfsHash2,
+        size,
+        'ha',
+        attestor
+      )
     ).to.be.revertedWith('ERC721: token already minted')
   })
 
-  it('Should not attest different property data signed', async() => {
-    // encode property data for signing
-    const payload = abiCoder.encode(
-      ['uint', 'string', 'string', 'uint', 'string'],
-      [tokenId,  title, 'QmUideC1r5JhMVwgd8vjC7DtVnXw3QGfCSQA7fUVHK789', size, 'ha']
-    )
-    // hash payload
-    const payloadHash = ethers.utils.keccak256(payload)
-    // sign encoded property data
-    // generate 32 bytes of data as Uint8Array
-    const payloadMessage = ethers.utils.arrayify(payloadHash)
-    const attestor = await accounts[2].signMessage(payloadMessage)
-    // recover signer
-    const sig = ethers.utils.splitSignature(attestor)
-    const signer = ethers.utils.verifyMessage(payloadMessage, sig)
+  it('Should not attest invalid property data signed', async() => {
+    const { attestor } = await signProperty(tokenId2, title2, ipfsHash2, size, 'ha', accounts[2])
     await expect(
       registry.connect(accounts[2]).attestProperty(
         tokenId2,
         title,
-        ipfsHash3,
+        ipfsHash2,
         size,
         'ha',
         attestor
@@ -161,45 +197,25 @@ describe('Registry:Attest Property', () => {
 
 describe('Registry:Claim Ownership', () => {
 
-  before('setup Registry contract', setupContract)
+  before('setup Registry contract', async() => {
+    await setupContract()
+    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+  })
 
-  it('Should attest ownership to property title', async() => {
-    await registerProperty(tokenId, ipfsHash)
-    // encode payload
-    const payload = abiCoder.encode(['string'], [title])
-    // hash payload
-    const payloadHash = ethers.utils.keccak256(payload)
-    // generate 32 bytes message to sign
-    const payloadMessage = ethers.utils.arrayify(payloadHash)
-    const attestor = await accounts[2].signMessage(payloadMessage)
-    expect(await registry.connect(accounts[2]).claimOwnership(title, attestor)).to.be.true
+  it('Should attest ownership to property', async() => {
+    const claimer = await signClaim(title, accounts[2])
+    expect(await registry.connect(accounts[2]).claimOwnership(title, claimer)).to.be.true
   })
 
   it('Should panic attest with wrong signer', async() => {
-    // encode payload
-    const payload = abiCoder.encode(['string'], [title2])
-    // hash payload
-    const payloadHash = ethers.utils.keccak256(payload)
-    // generate 32 bytes message to sign
-    const payloadMessage = ethers.utils.arrayify(payloadHash)
-    const attestor = await accounts[2].signMessage(payloadMessage)
-    expect(await registry.connect(accounts[2]).claimOwnership(title, attestor)).to.be.false
+    const claimer = await signClaim(title, accounts[3])
+    expect(await registry.connect(accounts[3]).claimOwnership(title, claimer)).to.be.false
   })
 
   it('Should panic attest with nonexistent property title', async() => {
-    // encode payload
-    const payload = abiCoder.encode(['string'], [title2])
-    // hash payload
-    const payloadHash = ethers.utils.keccak256(payload)
-    // generate 32 bytes message to sign
-    const payloadMessage = ethers.utils.arrayify(payloadHash)
-    const attestor = await accounts[2].signMessage(payloadMessage)
-    await expect(
-      registry.connect(accounts[2]).claimOwnership(
-        title2,
-        attestor
-      )
-    ).to.be.revertedWith('REGISTRY: nonexistent title')
+    const claimer = await signClaim(title, accounts[2])
+    await expect(registry.connect(accounts[2]).claimOwnership(title2, claimer)).to.be.revertedWith('REGISTRY: nonexistent title')
   })
 })
 
@@ -240,11 +256,211 @@ describe('Registry:Agreement#agreementAt', () => {
 
 describe('Registry:Agreement#sealAgreement', () => {
 
-  before('setup Registry contract', setupContract)
+  before('setup Registry contract', async() => {
+    await setupContract()
+    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+  })
 
-  it('Should revert sealing agreement with invalid property title', async() => {
-    await registerProperty(tokenId2, ipfsHash2)
-    const { ownerSign, tenantSign } = await sealAgreement('Avocado', tenantSize, currentDateForwardADay, cost, title2)
-    await expect(registry.sealAgreement('Avocado farm', tenantSize, currentDateForwardADay, cost, title2, ownerSign, tenantSign)).to.be.revertedWith('REGISTRY: nonexistent titl')
+  it('Should revert sealing agreement for nonexistent property', async() => {
+    const ownerSign = await ownerSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title,
+      accounts[2],
+    )
+    const tenantSign = await tenantSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title,
+      accounts[3],
+    )
+    await expect(
+      registry.sealAgreement(
+        rentPurpose,
+        tenantSize,
+        rentDuration,
+        cost,
+        title2,
+        ownerSign,
+        tenantSign
+      )
+    ).to.be.reverted
+  })
+
+  it('Should revert sealing agreement with greater size', async() => {
+    const ownerSign = await ownerSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title,
+      accounts[2],
+    )
+    const tenantSign = await tenantSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title,
+      accounts[3],
+    )
+    await expect(
+      registry.sealAgreement(
+        rentPurpose,
+        overSize,
+        rentDuration,
+        cost,
+        title,
+        ownerSign,
+        tenantSign
+      )
+    ).to.be.reverted
+  })
+
+  it('Should revert unauthenticated owner', async() => {
+    const ownerSign = await ownerSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title2,
+      accounts[2],
+    )
+    const tenantSign = await tenantSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title,
+      accounts[3],
+    )
+    await expect(
+      registry.sealAgreement(
+        rentPurpose,
+        tenantSize,
+        rentDuration,
+        cost,
+        title,
+        ownerSign,
+        tenantSign
+      )
+    ).to.be.revertedWith('invalid owner signature')
+  })
+
+  it('Should revert unauthenticated tenant', async() => {
+    const ownerSign = await ownerSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title,
+      accounts[2],
+    )
+    const tenantSign = await tenantSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title2,
+      accounts[3],
+    )
+    await expect(
+      registry.sealAgreement(
+        rentPurpose,
+        tenantSize,
+        rentDuration,
+        cost,
+        title,
+        ownerSign,
+        tenantSign
+      )
+    ).to.be.revertedWith('cannot authenticate tenant')
+  })
+
+  it('Should revert if latest agreement is not fullfilled', async() => {
+    const ownerSign = await ownerSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title,
+      accounts[2],
+    )
+    const tenantSign = await tenantSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title,
+      accounts[3],
+    )
+    await registry.connect(accounts[3]).sealAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title,
+      ownerSign,
+      tenantSign
+    )
+    await expect(
+      registry.connect(accounts[3]).sealAgreement(
+        rentPurpose,
+        tenantSize,
+        restrictedDuration,
+        cost,
+        title,
+        ownerSign,
+        tenantSign
+      )
+    ).to.be.revertedWith('latest running agreement')
+  })
+
+  it('Should seal agreement correctly', async() => {
+    await setupContract()
+    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+    const ownerSign = await ownerSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title,
+      accounts[2],
+    )
+    const tenantSign = await tenantSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title,
+      accounts[3],
+    )
+    await expect(
+      registry.connect(accounts[3]).sealAgreement(
+        rentPurpose,
+        tenantSize,
+        rentDuration,
+        cost,
+        title,
+        ownerSign,
+        tenantSign
+      )
+    ).to.emit(registry, 'Sealed').withArgs(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      title,
+      ownerSign,
+      tenantSign,
+      tokenId
+    )
   })
 })
+
