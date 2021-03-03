@@ -223,6 +223,9 @@ contract PropertyUsage {
     bytes32 message = recreateClaimMessage(title);
     // get signer
     address claimer = whoIsSigner(message, signature);
-    return (((block.timestamp < _agreements[claimer].duration) && (claimer == _agreements[claimer].tenant) && recreateClaimMessage(_agreements[claimer].titleNo) == message), _agreements[claimer].duration, _agreements[claimer].titleNo);
+    return (
+      ((block.timestamp < _agreements[claimer].duration) &&
+      (claimer == _agreements[claimer].tenant) &&
+      recreateClaimMessage(_agreements[claimer].titleNo) == message), _agreements[claimer].duration, _agreements[claimer].titleNo);
   }
 }
