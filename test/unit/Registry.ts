@@ -58,7 +58,7 @@ describe('Registry:Attest Property', () => {
   before('setup Registry contract', setupContract)
 
   it('Should attest title property and emit Attestation event', async() => {
-    const { attestor, signer } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2]) 
+    const { attestor, signer } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
     await expect(
       registry.connect(accounts[2]).attestProperty(
         tokenId,
@@ -82,7 +82,7 @@ describe('Registry:Attest Property', () => {
   })
 
   it('Should not attest duplicate property', async() => {
-    const { attestor, signer } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2]) 
+    const { attestor, signer } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
     await expect(
       registry.connect(accounts[2]).attestProperty(
         tokenId,
@@ -96,7 +96,7 @@ describe('Registry:Attest Property', () => {
   })
 
   it('Should not attest duplicate property tokenId', async() => {
-    const { attestor, signer } = await signProperty(tokenId, title2, ipfsHash2, size, 'ha', accounts[2]) 
+    const { attestor, signer } = await signProperty(tokenId, title2, ipfsHash2, size, 'ha', accounts[2])
     await expect(
       registry.connect(accounts[2]).attestProperty(
         tokenId,
