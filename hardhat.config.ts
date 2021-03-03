@@ -8,4 +8,4 @@ export default {
   solidity: {
     version: "0.8.0",
   },
-} as HardhatUserConfig;
+} as HardhatUserConfig
