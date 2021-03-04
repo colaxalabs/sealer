@@ -28,6 +28,7 @@ contract PropertyUsage {
     address owner;
     address tenant;
     string titleNo;
+    bool fullFilled;
   }
 
   // ERC721 token contract
@@ -196,7 +197,8 @@ contract PropertyUsage {
         cost: cost,
         owner: owner,
         tenant: tenant,
-        titleNo: titleNo
+        titleNo: titleNo,
+        fullFilled: false
       });
       emit Sealed(
         purpose,
@@ -226,6 +228,7 @@ contract PropertyUsage {
     return (
       ((block.timestamp < _agreements[claimer].duration) &&
       (claimer == _agreements[claimer].tenant) &&
-      recreateClaimMessage(_agreements[claimer].titleNo) == message), _agreements[claimer].duration, _agreements[claimer].titleNo);
+      recreateClaimMessage(_agreements[claimer].titleNo) == message &&
+      !_agreements[claimer].fullFilled), _agreements[claimer].duration, _agreements[claimer].titleNo);
   }
 }
