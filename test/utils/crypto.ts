@@ -28,9 +28,9 @@ export const signProperty = async(
   return { attestor, signer }
 }
 
-export const signClaim = async(titleNo: string, signer: Signer) => {
+export const signClaim = async(titleNo: string, tokenId: number, signer: Signer) => {
   // encode payload
-  const payload = abiCoder.encode(['string'], [titleNo])
+  const payload = abiCoder.encode(['string', 'uint'], [titleNo, tokenId])
   // hash payload
   const payloadHash = ethers.utils.keccak256(payload)
   // convert 32 bytes hash to Uint8Array
@@ -40,11 +40,11 @@ export const signClaim = async(titleNo: string, signer: Signer) => {
   return claimer
 }
 
-export const ownerSignsAgreement = async(purposeForRent: string, rentSize: BigNumberish, duration: number, durationCost: BigNumberish, titleNo: string, owner: Signer) => {
+export const ownerSignsAgreement = async(purposeForRent: string, rentSize: BigNumberish, duration: number, durationCost: BigNumberish, tokenId: number, owner: Signer) => {
   // encode payload
   const payload = abiCoder.encode(
-    ['string', 'uint', 'uint', 'uint', 'string'],
-    [purposeForRent, rentSize, duration, durationCost, titleNo]
+    ['string', 'uint', 'uint', 'uint', 'uint'],
+    [purposeForRent, rentSize, duration, durationCost, tokenId]
   )
   // hash payload
   const payloadHash = ethers.utils.keccak256(payload)
@@ -55,11 +55,11 @@ export const ownerSignsAgreement = async(purposeForRent: string, rentSize: BigNu
   return ownerSign
 }
 
-export const tenantSignsAgreement = async(purposeForRent: string, rentSize: BigNumberish, duration: number, durationCost: BigNumberish, titleNo: string, tenant: Signer) => {
+export const tenantSignsAgreement = async(purposeForRent: string, rentSize: BigNumberish, duration: number, durationCost: BigNumberish, tokenId: number, tenant: Signer) => {
   // encode payload
   const payload = abiCoder.encode(
-    ['string', 'uint', 'uint', 'uint', 'string'],
-    [purposeForRent, rentSize, duration, durationCost, titleNo]
+    ['string', 'uint', 'uint', 'uint', 'uint'],
+    [purposeForRent, rentSize, duration, durationCost, tokenId]
   )
   // hash payload
   const payloadHash = ethers.utils.keccak256(payload)
@@ -70,9 +70,9 @@ export const tenantSignsAgreement = async(purposeForRent: string, rentSize: BigN
   return tenantSign
 }
 
-export const signUsageClaim = async(title: string, claimer: Signer) => {
+export const signUsageClaim = async(title: string, tokenId: number, claimer: Signer) => {
   // encode payload
-  const payload = abiCoder.encode(['string'], [title])
+  const payload = abiCoder.encode(['string', 'uint'], [title, tokenId])
   // hash payload
   const payloadHash = ethers.utils.keccak256(payload)
   // convert payload 32 bytes hash to Uint8Array

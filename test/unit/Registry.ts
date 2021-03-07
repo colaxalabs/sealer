@@ -133,18 +133,13 @@ describe('Registry:Claim Ownership', () => {
   })
 
   it('Should attest ownership to property', async() => {
-    const claimer = await signClaim(title, accounts[2])
-    expect(await registry.connect(accounts[2]).claimOwnership(title, claimer)).to.be.true
+    const claimer = await signClaim(title, tokenId, accounts[2])
+    expect(await registry.connect(accounts[2]).claimOwnership(title, tokenId, claimer)).to.be.true
   })
 
   it('Should panic attest with wrong signer', async() => {
-    const claimer = await signClaim(title, accounts[3])
-    expect(await registry.connect(accounts[3]).claimOwnership(title, claimer)).to.be.false
-  })
-
-  it('Should panic attest with nonexistent property title', async() => {
-    const claimer = await signClaim(title, accounts[2])
-    await expect(registry.connect(accounts[2]).claimOwnership(title2, claimer)).to.be.revertedWith('REGISTRY: nonexistent title')
+    const claimer = await signClaim(title, tokenId, accounts[3])
+    expect(await registry.connect(accounts[3]).claimOwnership(title, tokenId, claimer)).to.be.false
   })
 })
 

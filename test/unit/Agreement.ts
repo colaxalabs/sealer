@@ -88,7 +88,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       accounts[2],
     )
     const tenantSign = await tenantSignsAgreement(
@@ -96,7 +96,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       accounts[3],
     )
     await expect(
@@ -105,7 +105,7 @@ describe('Registry:Agreement#sealAgreement', () => {
         tenantSize,
         rentDuration,
         cost,
-        title2,
+        tokenId2,
         ownerSign,
         tenantSign
       )
@@ -118,7 +118,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       accounts[2],
     )
     const tenantSign = await tenantSignsAgreement(
@@ -126,7 +126,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       accounts[3],
     )
     await expect(
@@ -135,7 +135,7 @@ describe('Registry:Agreement#sealAgreement', () => {
         overSize,
         rentDuration,
         cost,
-        title,
+        tokenId,
         ownerSign,
         tenantSign
       )
@@ -148,7 +148,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title2,
+      tokenId2,
       accounts[2],
     )
     const tenantSign = await tenantSignsAgreement(
@@ -156,7 +156,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       accounts[3],
     )
     await expect(
@@ -165,11 +165,11 @@ describe('Registry:Agreement#sealAgreement', () => {
         tenantSize,
         rentDuration,
         cost,
-        title,
+        tokenId,
         ownerSign,
         tenantSign
       )
-    ).to.be.revertedWith('invalid owner signature')
+    ).to.be.revertedWith('cannot authenticate owner')
   })
 
   it('Should revert unauthenticated tenant', async() => {
@@ -178,7 +178,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       accounts[2],
     )
     const tenantSign = await tenantSignsAgreement(
@@ -186,7 +186,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title2,
+      tokenId2,
       accounts[3],
     )
     await expect(
@@ -195,7 +195,7 @@ describe('Registry:Agreement#sealAgreement', () => {
         tenantSize,
         rentDuration,
         cost,
-        title,
+        tokenId,
         ownerSign,
         tenantSign
       )
@@ -208,7 +208,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       accounts[2],
     )
     const tenantSign = await tenantSignsAgreement(
@@ -216,7 +216,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       accounts[3],
     )
     await usage.connect(accounts[3]).sealAgreement(
@@ -224,7 +224,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       ownerSign,
       tenantSign
     )
@@ -234,7 +234,7 @@ describe('Registry:Agreement#sealAgreement', () => {
         tenantSize,
         restrictedDuration,
         cost,
-        title,
+        tokenId,
         ownerSign,
         tenantSign
       )
@@ -250,7 +250,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       accounts[2],
     )
     const tenantSign = await tenantSignsAgreement(
@@ -258,7 +258,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       accounts[3],
     )
     await expect(
@@ -267,7 +267,7 @@ describe('Registry:Agreement#sealAgreement', () => {
         tenantSize,
         rentDuration,
         cost,
-        title,
+        tokenId,
         ownerSign,
         tenantSign
       )
@@ -281,6 +281,7 @@ describe('Registry:Agreement#sealAgreement', () => {
       await accounts[3].getAddress(),
       tokenId
     )
+    expect(await usage.getRights(tokenId)).to.eq(size.sub(tenantSize))
   })
 })
 
@@ -297,7 +298,7 @@ describe('Registry:Agreement#claimUsageRights', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       accounts[2],
     )
     const tenantSign = await tenantSignsAgreement(
@@ -305,7 +306,7 @@ describe('Registry:Agreement#claimUsageRights', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       accounts[3],
     )
     await usage.connect(accounts[3]).sealAgreement(
@@ -313,20 +314,15 @@ describe('Registry:Agreement#claimUsageRights', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
+      tokenId,
       ownerSign,
       tenantSign
     )
   })
 
-  it('Should revert claiming usage rights on unattested property title', async() => {
-    const claimerSign = await signUsageClaim(title3, accounts[3])
-    await expect(usage.claimUsageRights(title3, claimerSign)).to.be.reverted
-  })
-
   it('Should revert claiming unauthorized usage on attested property title', async() => {
-    const claimerSign = await signUsageClaim(title2, accounts[3])
-    const resp = await usage.claimUsageRights(title2, claimerSign)
+    const claimerSign = await signUsageClaim(title2, tokenId2, accounts[3])
+    const resp = await usage.claimUsageRights(title2, tokenId2, claimerSign)
     expect(resp.length).to.eq(3)
     expect(resp[0]).to.be.false
     expect(resp[1].toNumber()).not.to.eq(zero)
@@ -334,11 +330,56 @@ describe('Registry:Agreement#claimUsageRights', () => {
   })
 
   it('Should claim usage rights correctly', async() => {
-    const claimerSign = await signUsageClaim(title, accounts[3])
-    const resp = await usage.claimUsageRights(title, claimerSign)
+    const claimerSign = await signUsageClaim(title, tokenId, accounts[3])
+    const resp = await usage.claimUsageRights(title, tokenId, claimerSign)
     expect(resp.length).to.eq(3)
     expect(resp[0]).to.be.true
     expect(resp[1].toNumber()).to.eq(rentDuration)
     expect(resp[2]).to.eq(title)
+  })
+})
+
+describe('Agreement#getRights', () => {
+  before('setup Agreement contract', async() => {
+    await setupContract()
+    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+  })
+
+  it('Should revert getting rights for non-claimed property rights', async() => {
+    await expect(usage.getRights(tokenId)).to.be.reverted
+  })
+
+  it('Should claim property rights correctly', async() => {
+    const ownerSign = await ownerSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      accounts[2],
+    )
+    const tenantSign = await tenantSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      accounts[3],
+    )
+    await usage.connect(accounts[3]).sealAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      ownerSign,
+      tenantSign
+    )
+    expect(await usage.getRights(tokenId)).to.eq(size.sub(tenantSize))
+  })
+
+  it('Should return remaining property rights to claim', async() => {
+    expect(await usage.getRights(tokenId)).to.eq(size.sub(tenantSize))
   })
 })
