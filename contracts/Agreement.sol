@@ -3,10 +3,14 @@
 pragma solidity ^0.8.0;
 
 import "./registry/Registry.sol";
+import "./lib/SafeMath.sol";
 import "./token/ERC721.sol";
 import "hardhat/console.sol";
 
 contract PropertyUsage {
+
+  using SafeMath for uint256;
+
   // @dev Emit Sealed after successful sealation
   event Sealed(
     string purpose,
@@ -28,7 +32,14 @@ contract PropertyUsage {
     address owner;
     address tenant;
     string titleNo;
+    uint256 tokenId;
     bool fullFilled;
+  }
+
+  // @dev Property rights
+  struct Rights {
+    uint256 rights;
+    bool claimed;
   }
 
   // ERC721 token contract
@@ -40,6 +51,8 @@ contract PropertyUsage {
   // Mapping user to previous agreement
   mapping(address => uint256) private _totalPrevAgreements;
   mapping(address => mapping(uint256 => Agreement)) private _prevAgreements;
+  // Mapping property to its rights
+  mapping(uint256 => Rights) private _rights;
 
   /**
    * @dev Init contract
@@ -58,6 +71,7 @@ contract PropertyUsage {
    * @param size Size of the land property
    * @param duration How long will the usage take?
    * @param cost Calculated cost after duration
+   * @param tokenId Tokenized property title
    * @return bytes32
    */
   function recreateAgreementMessage(
@@ -65,10 +79,10 @@ contract PropertyUsage {
     uint256 size,
     uint256 duration,
     uint256 cost,
-    string memory titleNo
+    uint256 tokenId
   ) internal pure returns (bytes32) {
     // hash agreement parameters
-    bytes32 payloadHash = keccak256(abi.encode(purpose, size, duration, cost, titleNo));
+    bytes32 payloadHash = keccak256(abi.encode(purpose, size, duration, cost, tokenId));
     // replay eth_sign on-chain
     bytes32 message = prefixed(payloadHash);
     return message;
@@ -78,11 +92,12 @@ contract PropertyUsage {
    * @notice Recreate message signed off-chain by usage rights claimer
    * @dev Return bytes32 of the usage claim signed off-chain by claimer
    * @param title Title of the property
+   * @param tokenId Tokenized property title
    * @return bytes32
    */
-  function recreateClaimMessage(string memory title) internal pure returns (bytes32) {
+  function recreateClaimMessage(string memory title, uint256 tokenId) internal pure returns (bytes32) {
     // hash property title of the claim
-    bytes32 payloadHash = keccak256(abi.encode(title));
+    bytes32 payloadHash = keccak256(abi.encode(title, tokenId));
     // replay eth_sign on-chain
     bytes32 message = prefixed(payloadHash);
     return message;
@@ -163,13 +178,24 @@ contract PropertyUsage {
     }
 
   /**
+   * @notice Get property rights
+   * @dev Returns available property rights
+   * @param tokenId Tokenized property title
+   * @return uint256
+   */
+  function getRights(uint256 tokenId) external view returns (uint256) {
+    require(_rights[tokenId].claimed);
+    return _rights[tokenId].rights;
+  }
+
+  /**
    * @notice Seal agreement signed off-chain
    * @dev Add property usage agreement signed by owner and tenant(s)
    * @param purpose Purpose
    * @param size Size of the property
    * @param duration How long with the usage last
    * @param cost Cost after duration overlaps
-   * @param titleNo Title of the property
+   * @param tokenId Tokenized property title
    * @param ownerSign Signature of property owner to verify ownership
    * @param tenantSign Signature to verify signer
    */
@@ -178,26 +204,36 @@ contract PropertyUsage {
       uint256 size,
       uint256 duration,
       uint256 cost,
-      string memory titleNo,
+      uint256 tokenId,
       bytes memory ownerSign,
       bytes memory tenantSign
     ) external {
-      require(registry._registryToId(titleNo) != 0);
-      require(size <= registry.titleSize(titleNo));
+      require(registry.titleSize(tokenId) != 0);
+      require(size <= registry.titleSize(tokenId));
       require(duration > _agreements[msg.sender].duration && _agreements[msg.sender].cost == 0, 'latest running agreement');
-      address owner = token.ownerOf(registry._registryToId(titleNo)); // get owner of the tokenized title
-      bytes32 message = recreateAgreementMessage(purpose, size, duration, cost, titleNo); // recreate message signed off-chain
-      require(whoIsSigner(message, ownerSign) == owner, 'invalid owner signature');
+      address owner = token.ownerOf(tokenId); // get owner of the tokenized title
+      bytes32 message = recreateAgreementMessage(purpose, size, duration, cost, tokenId); // recreate message signed off-chain
+      require(whoIsSigner(message, ownerSign) == owner, 'cannot authenticate owner');
       address tenant = whoIsSigner(message, tenantSign);
       require(tenant == msg.sender, 'cannot authenticate tenant');
-      _agreements[msg.sender] = Agreement({
+      // Check if property rights have been claimed
+      if (!_rights[tokenId].claimed) {
+        _rights[tokenId] = Rights({
+          rights: registry.titleSize(tokenId),
+          claimed: true
+        });
+      }
+      require(_rights[tokenId].rights != 0);
+      _rights[tokenId].rights = _rights[tokenId].rights.sub(size);
+      _agreements[tenant] = Agreement({
         purpose: purpose,
         size: size,
         duration: duration,
         cost: cost,
         owner: owner,
         tenant: tenant,
-        titleNo: titleNo,
+        titleNo: registry._idToTitle(tokenId),
+        tokenId: tokenId,
         fullFilled: false
       });
       emit Sealed(
@@ -205,10 +241,10 @@ contract PropertyUsage {
         size,
         duration,
         cost,
-        titleNo,
-        _agreements[msg.sender].owner,
-        _agreements[msg.sender].tenant,
-        registry._registryToId(titleNo)
+        registry._idToTitle(tokenId),
+        _agreements[tenant].owner,
+        _agreements[tenant].tenant,
+        tokenId
       );
     }
 
@@ -216,19 +252,19 @@ contract PropertyUsage {
    * @notice Claim usage rights to a property
    * @dev Return if an accounts(user) has a valid usage rights to an attested property
    * @param title Title of the property
+   * @param tokenId Tokenized property title
    * @param signature Signature of the claimer
    * @return (bool, uint256)
    */
-  function claimUsageRights(string memory title, bytes memory signature) external view returns (bool, uint256, string memory) {
-    require(registry._registryToId(title) != 0);
+  function claimUsageRights(string memory title, uint256 tokenId, bytes memory signature) external view returns (bool, uint256, string memory) {
     //recreate claim message signed off-chain
-    bytes32 message = recreateClaimMessage(title);
+    bytes32 message = recreateClaimMessage(title, tokenId);
     // get signer
     address claimer = whoIsSigner(message, signature);
     return (
       ((block.timestamp < _agreements[claimer].duration) &&
       (claimer == _agreements[claimer].tenant) &&
-      recreateClaimMessage(_agreements[claimer].titleNo) == message &&
+      recreateClaimMessage(_agreements[claimer].titleNo, _agreements[claimer].tokenId) == message &&
       !_agreements[claimer].fullFilled), _agreements[claimer].duration, _agreements[claimer].titleNo);
   }
 }

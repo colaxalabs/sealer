@@ -6,6 +6,7 @@ import "../token/ERC721.sol";
 import "hardhat/console.sol";
 
 contract Registry {
+
   // @dev Emit Attestation after successful registration
   event Attestation(
     uint256 _tokenId,
@@ -31,11 +32,11 @@ contract Registry {
   // @dev Total number of tokenized lands
   uint256 private _totalLands;
   // Mapping titleNo/regNo to tokenId
-  mapping(string => uint256) public _registryToId;
+  mapping(uint256 => string) public _idToTitle;
   // Mapping used title documents
   mapping(bytes32 => bool) private _nonce;
-  // Mapping title to land
-  mapping(string => Land) private _titleLand;
+  // Mapping tokenized title to land
+  mapping(uint256 => Land) private _titleLand;
 
   /**
    * @dev Init contract
@@ -66,12 +67,11 @@ contract Registry {
   /**
    * @notice Size of an attested property
    * @dev Return the size of a land
-   * @param title Title of the property
+   * @param tokenId Tokenized property title
    * @return uint256
    */
-  function titleSize(string memory title) external view returns (uint256) {
-    require(_registryToId[title] != 0);
-    return _titleLand[title].size;
+  function titleSize(uint256 tokenId) external view returns (uint256) {
+    return _titleLand[tokenId].size;
   }
 
   /**
@@ -95,10 +95,10 @@ contract Registry {
     address signer = whoIsSigner(message, attestor);
     // Mint tokenId
     nftContract._safeMint(signer, tokenId);
-    _registryToId[title] = tokenId; // reference title to minted tokenID
+    _idToTitle[tokenId] = title; // reference title to minted tokenID
     _totalLands += 1;
     // Store land structure
-    _titleLand[title] = Land({
+    _titleLand[tokenId] = Land({
       tokenId: tokenId,
       title: title,
       titleDocument: documentHash,
@@ -119,18 +119,20 @@ contract Registry {
   /**
    * @notice Claim ownership to land title
    * @dev Check if signer is the owner of the property in title
-   * @param title Title of the land(use to recreate message signed off-chain on-chain)
+   * @param title Title of the land
+   * @param tokenId Tokenized property title
    * @param signature Signature of the claimer
    * return bool
    */
-  function claimOwnership(string memory title, bytes memory signature) external view returns (bool) {
-    require(_registryToId[title] != 0, "REGISTRY: nonexistent title");
-    bytes32 payloadHash = keccak256(abi.encode(title));
+  function claimOwnership(string memory title, uint256 tokenId, bytes memory signature) external view returns (bool) {
+    // recreate message signed off-chain by claimer
+    bytes32 payloadHash = keccak256(abi.encode(title, tokenId));
     bytes32 message = prefixed(payloadHash);
+    // authenticate claimer
     require(whoIsSigner(message, signature) == msg.sender, 'cannot authenticate claimer');
     // get property details
-    Land storage _land = _titleLand[title];
-    return (whoIsSigner(message, signature) == _land.attestor) && (payloadHash == keccak256(abi.encode(_land.title)));
+    Land storage _land = _titleLand[tokenId];
+    return (whoIsSigner(message, signature) == _land.attestor);
   }
 
   /**
