@@ -23,6 +23,13 @@ contract PropertyUsage {
     uint256 tokenId
   );
 
+  // @dev Emit Reclaimed after property rights reclamation
+  event Reclaimed(
+    uint256 tokenId,
+    uint256 rights,
+    bool fullFilled
+  );
+
   // @dev Usage agreement
   struct Agreement {
     string purpose;
@@ -49,8 +56,11 @@ contract PropertyUsage {
   // Mapping user to latest agreement
   mapping(address => Agreement) private _agreements;
   // Mapping user to previous agreement
-  mapping(address => uint256) private _totalPrevAgreements;
+  mapping(address => uint256) private _userAgreements;
   mapping(address => mapping(uint256 => Agreement)) private _prevAgreements;
+  // Mapping property to previous agreement
+  mapping(uint256 => uint256) private _propertyPrevAgreements;
+  mapping(uint256 => mapping(uint256 => Agreement)) private _propertyFullfilledAgreements;
   // Mapping property to its rights
   mapping(uint256 => Rights) private _rights;
 
@@ -63,6 +73,96 @@ contract PropertyUsage {
     // load ERC721 contract
     token = ERC721(tokenAddress);
   }
+
+ /**
+  * @notice Total previous property agreements
+  * @dev Return total previous fullfiled agreements for a property
+  * @param tokenId Tokenized property title
+  * @return uint256
+  */
+  function propertyAgreements(uint256 tokenId) external view returns (uint256) {
+    return _propertyPrevAgreements[tokenId];
+  }
+
+ /**
+  * @notice Get property agreement
+  * @dev Return property agreement at an index
+  * @param tokenId Tokenized property title
+  * @param index Index of the agreement
+  * @return (string, uint256, uint256, uint256, address, address, string, bool)
+  */
+ function propertyAgreementAt(uint256 tokenId, uint256 index)
+    external
+    view
+    returns (
+      string memory,
+      uint256,
+      uint256,
+      uint256,
+      address,
+      address,
+      string memory,
+      bool
+    ) {
+      require(index <= _propertyPrevAgreements[tokenId], 'REGISTRY: index out of range');
+      Agreement storage _agreement = _propertyFullfilledAgreements[tokenId][index];
+      return (
+        _agreement.purpose,
+        _agreement.size,
+        _agreement.duration,
+        _agreement.cost,
+        _agreement.owner,
+        _agreement.tenant,
+        _agreement.titleNo,
+        _agreement.fullFilled
+      );
+    }
+
+  /**
+   * @notice Total previous account agreements
+   * @dev Get total previous agreements of an account
+   * @param who Address
+   * @return uint256
+   */
+  function userAgreements(address who) external view returns (uint256) {
+    require(who != address(0), "REGISTRY: zero address");
+    return _userAgreements[who];
+  }
+
+  /**
+   * @notice Previous agreements of an account at an index
+   * @dev Get account agreement at a certain index
+   * @param who Address of an account
+   * @param index Index in previous agreements mappings
+   * @return (string, uint256, uint256, uint256, address, address, string, bool)
+   */
+  function userAgreementAt(address who, uint256 index)
+    external
+    view
+    returns (
+      string memory,
+      uint256,
+      uint256,
+      uint256,
+      address,
+      address,
+      string memory,
+      bool
+    ) {
+      require(who != address(0), 'REGISTRY: zero address');
+      require(index <= _userAgreements[who], 'REGISTRY: index out of range');
+      Agreement storage _agreement = _prevAgreements[who][index];
+      return (
+        _agreement.purpose,
+        _agreement.size,
+        _agreement.duration,
+        _agreement.cost,
+        _agreement.owner,
+        _agreement.tenant,
+        _agreement.titleNo,
+        _agreement.fullFilled
+      );
+    }
 
   /**
    * @notice Recreate message signed off-chain by property owner and tenant
@@ -140,42 +240,6 @@ contract PropertyUsage {
     }
 
   }
-
-  /**
-   * @notice Total previous account agreements
-   * @dev Get total previous agreements of an account
-   * @param who Address
-   * @return uint256
-   */
-  function totalPrevAgreements(address who) external view returns (uint256) {
-    require(who != address(0), "REGISTRY: zero address");
-    return _totalPrevAgreements[who];
-  }
-
-  /**
-   * @notice Previous agreements of an account at an index
-   * @dev Get account agreement at a certain index
-   * @param who Address of an account
-   * @param index Index in previous agreements mappings
-   * @return (string, uint256, uint256, uint256, address, address, string)
-   */
-  function agreementAt(address who, uint256 index)
-    external
-    view
-    returns (string memory, uint256, uint256, uint256, address, address, string memory) {
-      require(who != address(0), 'REGISTRY: zero address');
-      require(index <= _totalPrevAgreements[who], 'REGISTRY: index out of range');
-      Agreement storage _agreement = _prevAgreements[who][index];
-      return (
-        _agreement.purpose,
-        _agreement.size,
-        _agreement.duration,
-        _agreement.cost,
-        _agreement.owner,
-        _agreement.tenant,
-        _agreement.titleNo
-      );
-    }
 
   /**
    * @notice Get property rights
@@ -264,7 +328,53 @@ contract PropertyUsage {
     return (
       ((block.timestamp < _agreements[claimer].duration) &&
       (claimer == _agreements[claimer].tenant) &&
+      _agreements[claimer].size != 0 &&
       recreateClaimMessage(_agreements[claimer].titleNo, _agreements[claimer].tokenId) == message &&
       !_agreements[claimer].fullFilled), _agreements[claimer].duration, _agreements[claimer].titleNo);
+  }
+
+  /**
+   * @notice Reclaim property rights and cost after agreement duration has elapsed
+   * @dev Reclaim property rights and transfer fund held in escrow to property owner
+   * @param purpose What was the agreement purpose
+   * @param size Requested size?
+   * @param duration How long was the agreement to last?
+   * @param cost How much did the agreement cost?
+   * @param tokenId Tokenized property title
+   * @param claimerSign Signature of the claimer(property owner)
+   * @param tenantSign Signature of the tenant
+   */
+  function reclaimRights(
+    string memory purpose,
+    uint256 size,
+    uint256 duration,
+    uint256 cost,
+    uint256 tokenId,
+    bytes memory claimerSign,
+    bytes memory tenantSign
+  ) external {
+    // recreate claim message signed off-chain
+    bytes32 message = recreateAgreementMessage(purpose, size, duration, cost, tokenId);
+    // get claimer
+    address claimer = whoIsSigner(message, claimerSign);
+    // get tenant
+    address tenant = whoIsSigner(message, tenantSign);
+    // get agreement
+    Agreement storage agreement = _agreements[tenant];
+    require(agreement.tenant == tenant, 'cannot authenticate tenant in agreement');
+    require(agreement.owner == claimer, 'cannot authenticate property owner in agreement');
+    require(claimer == msg.sender, 'cannot authenticate claimer');
+    require(agreement.duration < block.timestamp, 'agreement timeline not fullfiled');
+    // reclaim rights from agreement back to property owner
+    _rights[tokenId].rights = _rights[tokenId].rights.add(agreement.size);
+    _agreements[tenant].size = 0;
+    _agreements[tenant].fullFilled = true;
+    // Account user fullfiled agreements
+    _userAgreements[tenant] += 1;
+    _prevAgreements[tenant][_userAgreements[tenant]] = agreement;
+    // Account property fullfilled agreements
+    _propertyPrevAgreements[tokenId] += 1;
+    _propertyFullfilledAgreements[tokenId][_propertyPrevAgreements[tokenId]] = agreement;
+    emit Reclaimed(tokenId, _rights[tokenId].rights, _agreements[tenant].fullFilled);
   }
 }
