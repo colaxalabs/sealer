@@ -1,6 +1,12 @@
 import { ethers } from 'hardhat'
 import { Signer, Contract } from 'ethers'
-import { signProperty, ownerSignsAgreement, tenantSignsAgreement, signUsageClaim } from '../utils/crypto'
+import {
+  signProperty,
+  ownerSignsAgreement,
+  tenantSignsAgreement,
+  signUsageClaim,
+  increaseTime
+} from '../utils/crypto'
 const { expect } = require('chai')
 
 const zero = ethers.constants.Zero
@@ -18,6 +24,7 @@ const overSize = ethers.utils.parseUnits('0.50', 18)
 const cost = ethers.utils.parseUnits('250.75', 18)
 const rentDuration = Math.floor(Date.now() / 1000) + (86400 * 14)
 const restrictedDuration = Math.floor(Date.now() / 1000) - (86400 * 13)
+const futureDate = rentDuration + (86400 * 21)
 const rentPurpose = 'Avocado season planting'
 
 let accounts: Signer[],
@@ -39,37 +46,37 @@ async function setupContract() {
   usage = await Usage.deploy(registry.address, token.address)
 }
 
-describe('Registry:Agreement#totalPrevAgreements', () => {
+describe('Registry:Agreement#userAgreements', () => {
 
   before('setup Registry contract', setupContract);
 
   it('Should revert getting previous agreements for account with zero address', async() => {
-    await expect(usage.totalPrevAgreements(addressZero)).to.be.revertedWith('REGISTRY: zero address')
+    await expect(usage.userAgreements(addressZero)).to.be.revertedWith('REGISTRY: zero address')
   })
 
   it('Should get total previous agreement for an account', async() => {
     const who = await accounts[2].getAddress()
-    expect(await usage.totalPrevAgreements(who)).to.eq(zero)
+    expect(await usage.userAgreements(who)).to.eq(zero)
   })
 })
 
-describe('Registry:Agreement#agreementAt', () => {
+describe('Registry:Agreement#userAgreementAt', () => {
 
   before('setup Registry contract', setupContract)
 
   it('Should revert query agreement for zero address', async() => {
-    await expect(usage.agreementAt(addressZero, 0)).to.be.revertedWith('REGISTRY: zero address')
+    await expect(usage.userAgreementAt(addressZero, 0)).to.be.revertedWith('REGISTRY: zero address')
   })
 
   it('Should revert query agreement for index gt current total previous agreements', async() => {
     const who = await accounts[3].getAddress()
-    await expect(usage.agreementAt(who, 1)).to.be.revertedWith('REGISTRY: index out of range')
+    await expect(usage.userAgreementAt(who, 1)).to.be.revertedWith('REGISTRY: index out of range')
   })
 
   it('Should get previous agreement for an account at an index correctly', async() => {
     const who = await accounts[4].getAddress()
-    const resp = await usage.agreementAt(who, 0) // returns a tuple of values
-    expect(resp.length).to.eq(7)
+    const resp = await usage.userAgreementAt(who, 0) // returns a tuple of values
+    expect(resp.length).to.eq(8)
     expect(resp[1].toNumber()).to.eq(0)
   })
 })
@@ -381,5 +388,216 @@ describe('Agreement#getRights', () => {
 
   it('Should return remaining property rights to claim', async() => {
     expect(await usage.getRights(tokenId)).to.eq(size.sub(tenantSize))
+  })
+})
+
+describe('Agreement#reclaimRights', () => {
+  let tenantSign: string, ownerSign: string
+
+  before('setup Agreement contract', async() => {
+    await setupContract()
+    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+    ownerSign = await ownerSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      accounts[2],
+    )
+    tenantSign = await tenantSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      accounts[3],
+    )
+    await usage.connect(accounts[3]).sealAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      ownerSign,
+      tenantSign
+    )
+  })
+
+  it('Should revert when tenant in agreement cannot be matched', async() => {
+    const tenantSign2 = await tenantSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      accounts[4],
+    )
+    await expect(
+      usage.connect(accounts[2]).reclaimRights(
+        rentPurpose,
+        tenantSize,
+        rentDuration,
+        cost,
+        tokenId,
+        ownerSign,
+        tenantSign2
+      )
+    ).to.be.revertedWith('cannot authenticate tenant in agreement')
+  })
+
+  it('Should revert when property owner in agreement cannot be matched', async() => {
+    const ownerSign2 = await ownerSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      accounts[3],
+    )
+    await expect(
+      usage.connect(accounts[2]).reclaimRights(
+        rentPurpose,
+        tenantSize,
+        rentDuration,
+        cost,
+        tokenId,
+        ownerSign2,
+        tenantSign
+      )
+    ).to.be.revertedWith('cannot authenticate property owner in agreement')
+  })
+
+  it('Should revert when method caller for reclaiming rights is not property owner', async() => {
+    await expect(
+      usage.connect(accounts[3]).reclaimRights(
+        rentPurpose,
+        tenantSize,
+        rentDuration,
+        cost,
+        tokenId,
+        ownerSign,
+        tenantSign
+      )
+    ).to.be.revertedWith('cannot authenticate claimer')
+  })
+
+  it('Should revert when agreement timeline has not elapsed', async() => {
+    await expect(
+      usage.connect(accounts[2]).reclaimRights(
+        rentPurpose,
+        tenantSize,
+        rentDuration,
+        cost,
+        tokenId,
+        ownerSign,
+        tenantSign
+      )
+    ).to.be.revertedWith('agreement timeline not fullfiled')
+  })
+
+  it('Should reclaim property rights correctly after agreement timelapse', async() => {
+    await increaseTime(futureDate)
+    await expect(
+      usage.connect(accounts[2]).reclaimRights(
+        rentPurpose,
+        tenantSize,
+        rentDuration,
+        cost,
+        tokenId,
+        ownerSign,
+        tenantSign
+      )
+    ).to.emit(usage, 'Reclaimed').withArgs(tokenId, size, true)
+    expect(await usage.userAgreements(await accounts[3].getAddress())).to.eq(ethers.BigNumber.from(1))
+    expect(await usage.propertyAgreements(tokenId)).to.eq(ethers.BigNumber.from(1))
+  })
+})
+
+describe('Agreement#propertyAgreements', () => {
+  
+  before('setup Agreement contract', setupContract)
+
+  it('Should get total of fullfiled agreements for a property', async() => {
+    expect(await usage.propertyAgreements(tokenId)).to.eq(zero)
+  })
+})
+
+describe('Agreement#propertyAgreementAt#propertyAgreements#userAgreements#userAgreementAt', () => {
+  let ownerSign: string, tenantSign: string, who: string
+  
+  before('setup Agreement contract', async() => {
+    await setupContract()
+    who = await accounts[3].getAddress()
+    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+    ownerSign = await ownerSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      accounts[2],
+    )
+    tenantSign = await tenantSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      accounts[3],
+    )
+    await usage.connect(accounts[3]).sealAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      ownerSign,
+      tenantSign
+    )
+    await usage.connect(accounts[2]).reclaimRights(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      ownerSign,
+      tenantSign
+    )
+  })
+
+  it('Should return total fullfiled property agreements correctly', async() => {
+    expect(await usage.propertyAgreements(tokenId)).to.eq(ethers.BigNumber.from(1))
+  })
+
+  it('Should return total fullfiled user agreements correctly', async() => {
+    expect(await usage.userAgreements(who)).to.eq(ethers.BigNumber.from(1))
+  })
+
+  it('Should revert querying agreements for user with zero address', async() => {
+    await expect(usage.userAgreementAt(addressZero, 1)).to.be.revertedWith('REGISTRY: zero address')
+  })
+  it('Should revert querying out of index agreements for user', async() => {
+    await expect(usage.userAgreementAt(who, 2)).to.be.revertedWith('REGISTRY: index out of range')
+  })
+
+  it('Should revert querying out of index agreements', async() => {
+    await expect(usage.propertyAgreementAt(tokenId, 2)).to.be.revertedWith('REGISTRY: index out of range')
+  })
+
+  it('Should get user agreements at an index correctly', async() => {
+    const resp = await usage.userAgreementAt(who, 1)
+    expect(resp.length).to.eq(8)
+    expect(resp[0]).to.eq(rentPurpose)
+    expect(resp[7]).to.be.true
+  })
+
+  it('Should get property agreement at an index correctly', async() => {
+    const resp = await usage.propertyAgreementAt(tokenId, 1)
+    expect(resp.length).to.eq(8)
+    expect(resp[0]).to.eq(rentPurpose)
+    expect(resp[7]).to.be.true
   })
 })
