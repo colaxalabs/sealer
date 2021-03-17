@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.0;
 
-import "./registry/Registry.sol";
-import "./lib/SafeMath.sol";
-import "./token/ERC721.sol";
+import "../registry/Registry.sol";
+import "../lib/SafeMath.sol";
+import "../token/ERC721.sol";
 import "hardhat/console.sol";
 
 contract PropertyUsage {
