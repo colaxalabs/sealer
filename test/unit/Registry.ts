@@ -143,3 +143,44 @@ describe('Registry:Claim Ownership', () => {
   })
 })
 
+describe('Registry#accountProperty', () => {
+  before('setup Registry contract', async() => {
+    await setupContract()
+    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+  })
+
+  it('Should panic getting total properties for zero address', async() => {
+    await expect(token.balanceOf(addressZero)).to.be.revertedWith('ERC721: balance query for zero address')
+  })
+
+  it('Should get total properties attested by user account', async() => {
+    const count = (await token.balanceOf(await accounts[2].getAddress())).toString()
+    expect(count).to.eq('1')
+  })
+
+  it('Should panic get property with invalid index', async() => {
+    await expect(registry.accountProperty(await accounts[2].getAddress(), 2)).to.be.revertedWith('index out of range')
+  })
+
+  it('Should get all properties belonging to an account', async() => {
+    const address = await accounts[2].getAddress()
+    let properties = []
+    const totalCount = Number(await token.balanceOf(address))
+    let property = {}
+    let resp
+    expect(totalCount).to.eq(1)
+    for (let i = 1; i <= totalCount; i++) {
+      resp = await registry.accountProperty(address, i)
+      property['tokenId'] = resp[0]
+      property['title'] = resp[1]
+      property['titleDocument'] = resp[2]
+      property['size'] = resp[3]
+      property['unit'] = resp[4]
+      property['attestor'] = resp[5]
+      properties[i-1] = property
+    }
+    expect(properties.length).to.eq(1)
+  })
+})
+
