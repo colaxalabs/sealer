@@ -18,7 +18,8 @@ export default {
     version: "0.8.0",
   },
   gasReporter: {
-    currency: 'USD',
+    currency: 'KES',
     enabled: process.env.REPORT_GAS ? true : false,
+    coinmarketcap: process.env.COIN_MARKET_API,
   },
 } as HardhatUserConfig
