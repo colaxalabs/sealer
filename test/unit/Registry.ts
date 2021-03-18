@@ -154,6 +154,10 @@ describe('Registry#accountProperty', () => {
     await expect(token.balanceOf(addressZero)).to.be.revertedWith('ERC721: balance query for zero address')
   })
 
+  it('Should panic getting property for zero address', async() => {
+    await expect(registry.accountProperty(addressZero, 1)).to.be.reverted
+  })
+
   it('Should get total properties attested by user account', async() => {
     const count = (await token.balanceOf(await accounts[2].getAddress())).toString()
     expect(count).to.eq('1')
