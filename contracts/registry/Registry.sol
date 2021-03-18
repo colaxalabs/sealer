@@ -37,6 +37,8 @@ contract Registry {
   mapping(bytes32 => bool) private _nonce;
   // Mapping tokenized title to land
   mapping(uint256 => Land) private _titleLand;
+  // Mapping account to its properties(ownership) user -> index -> property
+  mapping(address => mapping(uint256 => Land)) private _accountProperties;
 
   /**
    * @dev Init contract
@@ -75,6 +77,30 @@ contract Registry {
   }
 
   /**
+    * @notice Get account property
+    * @dev Return account property at an index
+    * @param who Account address
+    * @param index Index of the property
+    * @return (uint256, string memory, string memory, uint256, string memory, address)
+    */
+   function accountProperty(
+           address who,
+           uint256 index
+   ) external view returns (uint256, string memory, string memory, uint256, string memory, address) {
+           require(who != address(0));
+           require(index <= nftContract.balanceOf(who), "index out of range");
+           Land storage _land = _accountProperties[who][index];
+           return (
+                   _land.tokenId,
+                   _land.title,
+                   _land.titleDocument,
+                   _land.size,
+                   _land.unit,
+                   _land.attestor
+           );
+   }
+
+  /**
    * @notice Add farm to the registry
    * @dev Attest ownership to a piece of land and append to registry
    * @param title Title of the land
@@ -83,7 +109,14 @@ contract Registry {
    * @param unit Measurement unit of size
    * @param attestor Attestor signature
    */
-  function attestProperty(uint256 tokenId, string memory title, string memory documentHash, uint256 size, string memory unit, bytes memory attestor) external {
+  function attestProperty(
+          uint256 tokenId,
+          string memory title,
+          string memory documentHash,
+          uint256 size,
+          string memory unit,
+          bytes memory attestor
+  ) external {
     require(!_nonce[keccak256(abi.encode(documentHash))], "REGISTRY: duplicate title document");
     _nonce[keccak256(abi.encode(documentHash))] = true;
 
@@ -106,6 +139,8 @@ contract Registry {
       unit: unit,
       attestor: signer
     });
+    // Record property to user attestor
+    _accountProperties[signer][nftContract.balanceOf(signer)] = _titleLand[tokenId];
     emit Attestation(
       tokenId,
       title,
