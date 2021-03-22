@@ -57,6 +57,23 @@ contract Registry {
     return _totalLands;
   }
 
+ /**
+  * @notice Get property
+  * @dev Return property details
+  * @param tokenId Tokenized property id
+  * @return (uint256, string memory, uint256, string memory, address)
+  */
+  function getProperty(uint256 tokenId) external view returns (uint256, string memory, uint256, string memory, address) {
+          Land storage _land = _titleLand[tokenId];
+          return (
+                  _land.tokenId,
+                  _land.title,
+                  _land.size,
+                  _land.unit,
+                  _land.attestor
+          );
+  }
+
   /**
    * @notice Total lands by user/account
    * @dev Return number of tokenized lands by user
