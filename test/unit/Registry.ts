@@ -188,3 +188,25 @@ describe('Registry#accountProperty', () => {
   })
 })
 
+describe('Registry#getProperty', () => {
+  before('setup Registry contract', async() => {
+    await setupContract()
+    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+  })
+
+  it('Should return property for non-tokenized id', async() => {
+    const resp = await registry.getProperty(324)
+    expect(resp.length).to.eq(5)
+    expect(resp[0]).to.eq(ethers.BigNumber.from(0))
+    expect(resp[4]).to.eq(addressZero)
+  })
+
+  it('Should return property for tokenized id', async() => {
+    const resp = await registry.getProperty(tokenId)
+    expect(resp.length).to.eq(5)
+    expect(resp[0]).to.eq(ethers.BigNumber.from(tokenId))
+    expect(resp[4]).to.eq(await accounts[2].getAddress())
+  })
+})
+

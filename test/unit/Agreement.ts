@@ -1,5 +1,5 @@
 import { ethers } from 'hardhat'
-import { Signer, Contract } from 'ethers'
+import { Signer, Contract, BigNumberish } from 'ethers'
 import {
   signProperty,
   ownerSignsAgreement,
@@ -599,5 +599,63 @@ describe('Agreement#propertyAgreementAt#propertyAgreements#userAgreements#userAg
     expect(resp.length).to.eq(8)
     expect(resp[0]).to.eq(rentPurpose)
     expect(resp[7]).to.be.true
+  })
+})
+
+describe('Agreement#getTransferredRights', () => {
+  let ownerSign: string, tenantSign: string, who: string, initialRights: BigNumberish
+  
+  before('setup Agreement contract', async() => {
+    await setupContract()
+    who = await accounts[3].getAddress()
+    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+    ownerSign = await ownerSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      accounts[2],
+    )
+    tenantSign = await tenantSignsAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      accounts[3],
+    )
+    await usage.connect(accounts[3]).sealAgreement(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      ownerSign,
+      tenantSign
+    )
+    initialRights = await usage.getTransferredRights(tokenId)
+    await usage.connect(accounts[2]).reclaimRights(
+      rentPurpose,
+      tenantSize,
+      rentDuration,
+      cost,
+      tokenId,
+      ownerSign,
+      tenantSign
+    )
+  })
+
+  it('Should return transferred rights for non-tokenized property', async() => {
+    expect(await usage.getTransferredRights(3344)).to.eq(ethers.BigNumber.from(0))
+  })
+
+  it('Should return initial rights after sealing agreement', async() => {
+    expect(initialRights).to.eq(ethers.BigNumber.from(tenantSize))
+  })
+
+  it('Should return transferred rights after reclaiming', async() => {
+    expect(await usage.getTransferredRights(tokenId)).to.eq(ethers.BigNumber.from(0))
   })
 })
