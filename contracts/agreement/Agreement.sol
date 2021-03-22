@@ -63,6 +63,7 @@ contract PropertyUsage {
   mapping(uint256 => mapping(uint256 => Agreement)) private _propertyFullfilledAgreements;
   // Mapping property to its rights
   mapping(uint256 => Rights) private _rights;
+  mapping(uint256 => uint256) private _transferredRights;
 
   /**
    * @dev Init contract
@@ -72,6 +73,16 @@ contract PropertyUsage {
     registry = Registry(registryAddress);
     // load ERC721 contract
     token = ERC721(tokenAddress);
+  }
+
+ /**
+  * @notice Property transferred rights
+  * @dev Return transferred rights for a property
+  * @param tokenId Tokenized property
+  * @return uint256
+  */
+  function getTransferredRights(uint256 tokenId) external view returns (uint256) {
+          return _transferredRights[tokenId];
   }
 
  /**
@@ -289,6 +300,9 @@ contract PropertyUsage {
       }
       require(_rights[tokenId].rights != 0);
       _rights[tokenId].rights = _rights[tokenId].rights.sub(size);
+      // Record transferred rights
+      _transferredRights[tokenId] = _transferredRights[tokenId].add(size);
+      // Record agreement
       _agreements[tenant] = Agreement({
         purpose: purpose,
         size: size,
@@ -375,6 +389,8 @@ contract PropertyUsage {
     // Account property fullfilled agreements
     _propertyPrevAgreements[tokenId] += 1;
     _propertyFullfilledAgreements[tokenId][_propertyPrevAgreements[tokenId]] = agreement;
+    // Reclaim transferred rights
+    _transferredRights[tokenId] = _transferredRights[tokenId].sub(size);
     emit Reclaimed(tokenId, _rights[tokenId].rights, _agreements[tenant].fullFilled);
   }
 }
