@@ -17,7 +17,6 @@ contract PropertyUsage {
     uint256 size,
     uint256 duration,
     uint256 cost,
-    string titleNo,
     address owner,
     address tenant,
     uint256 tokenId
@@ -38,7 +37,6 @@ contract PropertyUsage {
     uint256 cost;
     address owner;
     address tenant;
-    string titleNo;
     uint256 tokenId;
     bool fullFilled;
   }
@@ -100,7 +98,7 @@ contract PropertyUsage {
   * @dev Return property agreement at an index
   * @param tokenId Tokenized property title
   * @param index Index of the agreement
-  * @return (string, uint256, uint256, uint256, address, address, string, bool)
+  * @return (string, uint256, uint256, uint256, address, address, uint256, bool)
   */
  function propertyAgreementAt(uint256 tokenId, uint256 index)
     external
@@ -112,7 +110,7 @@ contract PropertyUsage {
       uint256,
       address,
       address,
-      string memory,
+      uint256,
       bool
     ) {
       require(index <= _propertyPrevAgreements[tokenId], 'REGISTRY: index out of range');
@@ -124,7 +122,7 @@ contract PropertyUsage {
         _agreement.cost,
         _agreement.owner,
         _agreement.tenant,
-        _agreement.titleNo,
+        _agreement.tokenId,
         _agreement.fullFilled
       );
     }
@@ -145,7 +143,7 @@ contract PropertyUsage {
    * @dev Get account agreement at a certain index
    * @param who Address of an account
    * @param index Index in previous agreements mappings
-   * @return (string, uint256, uint256, uint256, address, address, string, bool)
+   * @return (string, uint256, uint256, uint256, address, address, uint256, bool)
    */
   function userAgreementAt(address who, uint256 index)
     external
@@ -157,7 +155,7 @@ contract PropertyUsage {
       uint256,
       address,
       address,
-      string memory,
+      uint256,
       bool
     ) {
       require(who != address(0), 'REGISTRY: zero address');
@@ -170,7 +168,7 @@ contract PropertyUsage {
         _agreement.cost,
         _agreement.owner,
         _agreement.tenant,
-        _agreement.titleNo,
+        _agreement.tokenId,
         _agreement.fullFilled
       );
     }
@@ -194,21 +192,6 @@ contract PropertyUsage {
   ) internal pure returns (bytes32) {
     // hash agreement parameters
     bytes32 payloadHash = keccak256(abi.encode(purpose, size, duration, cost, tokenId));
-    // replay eth_sign on-chain
-    bytes32 message = prefixed(payloadHash);
-    return message;
-  }
-
-  /**
-   * @notice Recreate message signed off-chain by usage rights claimer
-   * @dev Return bytes32 of the usage claim signed off-chain by claimer
-   * @param title Title of the property
-   * @param tokenId Tokenized property title
-   * @return bytes32
-   */
-  function recreateClaimMessage(string memory title, uint256 tokenId) internal pure returns (bytes32) {
-    // hash property title of the claim
-    bytes32 payloadHash = keccak256(abi.encode(title, tokenId));
     // replay eth_sign on-chain
     bytes32 message = prefixed(payloadHash);
     return message;
@@ -310,7 +293,6 @@ contract PropertyUsage {
         cost: cost,
         owner: owner,
         tenant: tenant,
-        titleNo: registry._idToTitle(tokenId),
         tokenId: tokenId,
         fullFilled: false
       });
@@ -319,7 +301,6 @@ contract PropertyUsage {
         size,
         duration,
         cost,
-        registry._idToTitle(tokenId),
         _agreements[tenant].owner,
         _agreements[tenant].tenant,
         tokenId
@@ -329,22 +310,39 @@ contract PropertyUsage {
   /**
    * @notice Claim usage rights to a property
    * @dev Return if an accounts(user) has a valid usage rights to an attested property
-   * @param title Title of the property
+   * @param purpose Usage purpose
+   * @param size Agreed size
+   * @param duration Agreed duration
+   * @param cost Agreed cost
    * @param tokenId Tokenized property title
    * @param signature Signature of the claimer
-   * @return (bool, uint256)
+   * @return (bool, uint256, uint256)
    */
-  function claimUsageRights(string memory title, uint256 tokenId, bytes memory signature) external view returns (bool, uint256, string memory) {
+  function claimUsageRights(
+          string memory purpose,
+          uint256 size,
+          uint256 duration,
+          uint256 cost,
+          uint256 tokenId,
+          bytes memory signature
+  ) external view returns (bool, uint256, uint256) {
     //recreate claim message signed off-chain
-    bytes32 message = recreateClaimMessage(title, tokenId);
+    bytes32 message = recreateAgreementMessage(purpose, size, duration, cost, tokenId);
     // get signer
     address claimer = whoIsSigner(message, signature);
+    Agreement storage _agreement = _agreements[claimer];
     return (
-      ((block.timestamp < _agreements[claimer].duration) &&
-      (claimer == _agreements[claimer].tenant) &&
-      _agreements[claimer].size != 0 &&
-      recreateClaimMessage(_agreements[claimer].titleNo, _agreements[claimer].tokenId) == message &&
-      !_agreements[claimer].fullFilled), _agreements[claimer].duration, _agreements[claimer].titleNo);
+      ((block.timestamp < _agreement.duration) &&
+      (claimer == _agreement.tenant) &&
+      _agreement.size != 0 &&
+      recreateAgreementMessage(
+              _agreement.purpose,
+              _agreement.size,
+              _agreement.duration,
+              _agreement.cost,
+              _agreement.tokenId
+        ) == message &&
+      !_agreement.fullFilled), _agreement.duration, _agreement.tokenId);
   }
 
   /**
