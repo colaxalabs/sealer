@@ -4,17 +4,15 @@ import { BigNumberish, Signer } from 'ethers'
 const abiCoder = ethers.utils.defaultAbiCoder
 
 export const signProperty = async(
-  _token: number,
-  _title: string,
+  _token: BigNumberish,
   _docHash: string,
   _size: BigNumberish,
-  _unit: string,
   _signer: Signer
 ) => {
   // encode property data for signing
   const payload = abiCoder.encode(
-    ['uint', 'string', 'string', 'uint', 'string'],
-    [_token,  _title, _docHash, _size, _unit]
+    ['uint', 'string', 'uint'],
+    [_token, _docHash, _size]
   )
   // hash payload
   const payloadHash = ethers.utils.keccak256(payload)
@@ -28,7 +26,7 @@ export const signProperty = async(
   return { attestor, signer }
 }
 
-export const signClaim = async(titleNo: string, tokenId: number, signer: Signer) => {
+export const signClaim = async(titleNo: string, tokenId: BigNumberish, signer: Signer) => {
   // encode payload
   const payload = abiCoder.encode(['string', 'uint'], [titleNo, tokenId])
   // hash payload
@@ -55,7 +53,7 @@ export const ownerSignsAgreement = async(purposeForRent: string, rentSize: BigNu
   return ownerSign
 }
 
-export const tenantSignsAgreement = async(purposeForRent: string, rentSize: BigNumberish, duration: number, durationCost: BigNumberish, tokenId: number, tenant: Signer) => {
+export const tenantSignsAgreement = async(purposeForRent: string, rentSize: BigNumberish, duration: BigNumberish, durationCost: BigNumberish, tokenId: BigNumberish, tenant: Signer) => {
   // encode payload
   const payload = abiCoder.encode(
     ['string', 'uint', 'uint', 'uint', 'uint'],
@@ -70,9 +68,9 @@ export const tenantSignsAgreement = async(purposeForRent: string, rentSize: BigN
   return tenantSign
 }
 
-export const signUsageClaim = async(title: string, tokenId: number, claimer: Signer) => {
+export const signUsageClaim = async(purpose: BigNumberish, size: BigNumberish, duration: BigNumberish, cost: BigNumberish, tokenId: BigNumberish, claimer: Signer) => {
   // encode payload
-  const payload = abiCoder.encode(['string', 'uint'], [title, tokenId])
+  const payload = abiCoder.encode(['string', 'uint', 'uint', 'uint', 'uint'], [purpose, size, duration, cost, tokenId])
   // hash payload
   const payloadHash = ethers.utils.keccak256(payload)
   // convert payload 32 bytes hash to Uint8Array

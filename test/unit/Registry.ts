@@ -58,14 +58,12 @@ describe('Registry:Attest Property', () => {
   before('setup Registry contract', setupContract)
 
   it('Should attest title property and emit Attestation event', async() => {
-    const { attestor, signer } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
+    const { attestor, signer } = await signProperty(tokenId, ipfsHash, size, accounts[2])
     await expect(
       registry.connect(accounts[2]).attestProperty(
         tokenId,
-        title,
         ipfsHash,
         size,
-        'ha',
         attestor
       )
     ).to.emit(
@@ -73,51 +71,43 @@ describe('Registry:Attest Property', () => {
       'Attestation'
     ).withArgs(
       tokenId,
-      title,
       ipfsHash,
       size,
-      'ha',
       signer
     )
   })
 
   it('Should not attest duplicate property', async() => {
-    const { attestor, signer } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
+    const { attestor, signer } = await signProperty(tokenId, ipfsHash, size, accounts[2])
     await expect(
       registry.connect(accounts[2]).attestProperty(
         tokenId,
-        title,
         ipfsHash,
         size,
-        'ha',
         attestor
       )
     ).to.be.revertedWith('REGISTRY: duplicate title document')
   })
 
   it('Should not attest duplicate property tokenId', async() => {
-    const { attestor, signer } = await signProperty(tokenId, title2, ipfsHash2, size, 'ha', accounts[2])
+    const { attestor, signer } = await signProperty(tokenId, ipfsHash2, size, accounts[2])
     await expect(
       registry.connect(accounts[2]).attestProperty(
         tokenId,
-        title2,
         ipfsHash2,
         size,
-        'ha',
         attestor
       )
     ).to.be.revertedWith('ERC721: token already minted')
   })
 
   it('Should not attest invalid property data signed', async() => {
-    const { attestor } = await signProperty(tokenId2, title2, ipfsHash2, size, 'ha', accounts[2])
+    const { attestor } = await signProperty(tokenId, ipfsHash2, size, accounts[2])
     await expect(
       registry.connect(accounts[2]).attestProperty(
         tokenId2,
-        title,
         ipfsHash2,
         size,
-        'ha',
         attestor
       )
     ).to.be.revertedWith('REGISTRY: cannot authenticate signer')
@@ -128,26 +118,26 @@ describe('Registry:Claim Ownership', () => {
 
   before('setup Registry contract', async() => {
     await setupContract()
-    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+    const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
   })
 
   it('Should attest ownership to property', async() => {
-    const claimer = await signClaim(title, tokenId, accounts[2])
-    expect(await registry.connect(accounts[2]).claimOwnership(title, tokenId, claimer)).to.be.true
+    const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    expect(await registry.connect(accounts[2]).claimOwnership(tokenId, ipfsHash, size, attestor)).to.be.true
   })
 
   it('Should panic attest with wrong signer', async() => {
-    const claimer = await signClaim(title, tokenId, accounts[3])
-    expect(await registry.connect(accounts[3]).claimOwnership(title, tokenId, claimer)).to.be.false
+    const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    await expect(registry.connect(accounts[3]).claimOwnership(tokenId, ipfsHash, size, attestor)).to.be.revertedWith("cannot authenticate claimer")
   })
 })
 
 describe('Registry#accountProperty', () => {
   before('setup Registry contract', async() => {
     await setupContract()
-    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+    const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
   })
 
   it('Should panic getting total properties for zero address', async() => {
@@ -177,11 +167,9 @@ describe('Registry#accountProperty', () => {
     for (let i = 1; i <= totalCount; i++) {
       resp = await registry.accountProperty(address, i)
       property['tokenId'] = resp[0]
-      property['title'] = resp[1]
-      property['titleDocument'] = resp[2]
-      property['size'] = resp[3]
-      property['unit'] = resp[4]
-      property['attestor'] = resp[5]
+      property['titleDocument'] = resp[1]
+      property['size'] = resp[2]
+      property['attestor'] = resp[3]
       properties[i-1] = property
     }
     expect(properties.length).to.eq(1)
@@ -191,22 +179,22 @@ describe('Registry#accountProperty', () => {
 describe('Registry#getProperty', () => {
   before('setup Registry contract', async() => {
     await setupContract()
-    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+    const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
   })
 
   it('Should return property for non-tokenized id', async() => {
     const resp = await registry.getProperty(324)
-    expect(resp.length).to.eq(5)
+    expect(resp.length).to.eq(4)
     expect(resp[0]).to.eq(ethers.BigNumber.from(0))
-    expect(resp[4]).to.eq(addressZero)
+    expect(resp[3]).to.eq(addressZero)
   })
 
   it('Should return property for tokenized id', async() => {
     const resp = await registry.getProperty(tokenId)
-    expect(resp.length).to.eq(5)
+    expect(resp.length).to.eq(4)
     expect(resp[0]).to.eq(ethers.BigNumber.from(tokenId))
-    expect(resp[4]).to.eq(await accounts[2].getAddress())
+    expect(resp[3]).to.eq(await accounts[2].getAddress())
   })
 })
 

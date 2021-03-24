@@ -11,9 +11,6 @@ const { expect } = require('chai')
 
 const zero = ethers.constants.Zero
 const addressZero = ethers.constants.AddressZero
-const title = '111/v0/43x/50300'
-const title2 = '111/v0/43x/4932'
-const title3 = '343/tr/8y'
 const ipfsHash = 'QmUfideC1r5JhMVwgd8vjC7DtVnXw3QGfCSQA7fUVHK789'
 const ipfsHash2 = 'QmUfideC1r5JhMVwgd8vjC7DtVnXw3QGfCSQA7fUVHK749'
 const tokenId = 32012223
@@ -85,8 +82,8 @@ describe('Registry:Agreement#sealAgreement', () => {
 
   before('setup Registry contract', async() => {
     await setupContract()
-    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+    const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
   })
 
   it('Should revert sealing agreement for nonexistent property', async() => {
@@ -250,8 +247,8 @@ describe('Registry:Agreement#sealAgreement', () => {
 
   it('Should seal agreement correctly', async() => {
     await setupContract()
-    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+    const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
     const ownerSign = await ownerSignsAgreement(
       rentPurpose,
       tenantSize,
@@ -283,7 +280,6 @@ describe('Registry:Agreement#sealAgreement', () => {
       tenantSize,
       rentDuration,
       cost,
-      title,
       await accounts[2].getAddress(),
       await accounts[3].getAddress(),
       tokenId
@@ -296,10 +292,10 @@ describe('Registry:Agreement#claimUsageRights', () => {
 
   before('setup Agreement contract', async() => {
     await setupContract()
-    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
-    const signer2 = await signProperty(tokenId2, title2, ipfsHash2, size, 'acres', accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
-    await registry.connect(accounts[2]).attestProperty(tokenId2, title2, ipfsHash2, size, 'acres', signer2.attestor)
+    const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    const signer2 = await signProperty(tokenId2, ipfsHash2, size, accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId,  ipfsHash, size, attestor)
+    await registry.connect(accounts[2]).attestProperty(tokenId2, ipfsHash2, size, signer2.attestor)
     const ownerSign = await ownerSignsAgreement(
       rentPurpose,
       tenantSize,
@@ -327,30 +323,30 @@ describe('Registry:Agreement#claimUsageRights', () => {
     )
   })
 
-  it('Should revert claiming unauthorized usage on attested property title', async() => {
-    const claimerSign = await signUsageClaim(title2, tokenId2, accounts[3])
-    const resp = await usage.claimUsageRights(title2, tokenId2, claimerSign)
+  it('Should return false claiming unauthorized usage on attested property title', async() => {
+    const claimerSign = await signUsageClaim(rentPurpose, tenantSize, rentDuration, cost, tokenId, accounts[4])
+    const resp = await usage.claimUsageRights(rentPurpose, tenantSize, rentDuration, cost, tokenId, claimerSign)
     expect(resp.length).to.eq(3)
     expect(resp[0]).to.be.false
-    expect(resp[1].toNumber()).not.to.eq(zero)
-    expect(resp[2]).to.eq(title)
+    expect(resp[1].toNumber()).to.eq(zero)
+    expect(resp[2]).to.eq(zero)
   })
 
   it('Should claim usage rights correctly', async() => {
-    const claimerSign = await signUsageClaim(title, tokenId, accounts[3])
-    const resp = await usage.claimUsageRights(title, tokenId, claimerSign)
+    const claimerSign = await signUsageClaim(rentPurpose, tenantSize, rentDuration, cost, tokenId, accounts[3])
+    const resp = await usage.claimUsageRights(rentPurpose, tenantSize, rentDuration, cost, tokenId, claimerSign)
     expect(resp.length).to.eq(3)
     expect(resp[0]).to.be.true
     expect(resp[1].toNumber()).to.eq(rentDuration)
-    expect(resp[2]).to.eq(title)
+    expect(resp[2]).to.eq(tokenId)
   })
 })
 
 describe('Agreement#getRights', () => {
   before('setup Agreement contract', async() => {
     await setupContract()
-    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+    const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
   })
 
   it('Should revert getting rights for non-claimed property rights', async() => {
@@ -396,8 +392,8 @@ describe('Agreement#reclaimRights', () => {
 
   before('setup Agreement contract', async() => {
     await setupContract()
-    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+    const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
     ownerSign = await ownerSignsAgreement(
       rentPurpose,
       tenantSize,
@@ -530,8 +526,8 @@ describe('Agreement#propertyAgreementAt#propertyAgreements#userAgreements#userAg
   before('setup Agreement contract', async() => {
     await setupContract()
     who = await accounts[3].getAddress()
-    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+    const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
     ownerSign = await ownerSignsAgreement(
       rentPurpose,
       tenantSize,
@@ -608,8 +604,8 @@ describe('Agreement#getTransferredRights', () => {
   before('setup Agreement contract', async() => {
     await setupContract()
     who = await accounts[3].getAddress()
-    const { attestor } = await signProperty(tokenId, title, ipfsHash, size, 'ha', accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, title, ipfsHash, size, 'ha', attestor)
+    const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
     ownerSign = await ownerSignsAgreement(
       rentPurpose,
       tenantSize,
