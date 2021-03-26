@@ -39,6 +39,8 @@ contract PropertyUsage {
     address tenant;
     uint256 tokenId;
     bool fullFilled;
+    bytes ownerSign;
+    bytes tenantSign;
   }
 
   // @dev Property rights
@@ -207,32 +209,13 @@ contract PropertyUsage {
 
   /**
    * @notice Split signer from signature
+   * @param v Parity of the y-co-ordinate of r
+   * @param r The x co-ordinate of r
+   * @param s The s value of the signature
    */
-  function whoIsSigner(bytes32 message, bytes memory sig) internal pure returns (address) {
-    bytes32 r;
-    bytes32 s;
-    uint8 v;
+  function whoIsSigner(bytes32 message, bytes memory sig, uint8 v, bytes32 r, bytes32 s) internal pure returns (address) {
     require(sig.length == 65, "REGISTRY: invalid signature to split");
-    // Split signature
-    assembly {
-      // first 32 bytes, after the length prefix
-      r := mload(add(sig, 32))
-      // second 32 bytes
-      s := mload(add(sig, 64))
-      // final byte (first byte of the next 32 bytes)
-      v := byte(0, mload(add(sig, 96)))
-    }
-
-    if (v < 27) {
-      v += 27;
-    }
-
-    if (v != 27 && v != 28) {
-      return address(0);
-    } else {
-      return ecrecover(message, v, r, s);
-    }
-
+    return ecrecover(message, v, r, s);
   }
 
   /**
@@ -270,10 +253,6 @@ contract PropertyUsage {
       require(size <= registry.titleSize(tokenId));
       require(duration > _agreements[msg.sender].duration && _agreements[msg.sender].cost == 0, 'latest running agreement');
       address owner = token.ownerOf(tokenId); // get owner of the tokenized title
-      bytes32 message = recreateAgreementMessage(purpose, size, duration, cost, tokenId); // recreate message signed off-chain
-      require(whoIsSigner(message, ownerSign) == owner, 'cannot authenticate owner');
-      address tenant = whoIsSigner(message, tenantSign);
-      require(tenant == msg.sender, 'cannot authenticate tenant');
       // Check if property rights have been claimed
       if (!_rights[tokenId].claimed) {
         _rights[tokenId] = Rights({
@@ -286,23 +265,25 @@ contract PropertyUsage {
       // Record transferred rights
       _transferredRights[tokenId] = _transferredRights[tokenId].add(size);
       // Record agreement
-      _agreements[tenant] = Agreement({
+      _agreements[msg.sender] = Agreement({
         purpose: purpose,
         size: size,
         duration: duration,
         cost: cost,
         owner: owner,
-        tenant: tenant,
+        tenant: msg.sender,
         tokenId: tokenId,
-        fullFilled: false
+        fullFilled: false,
+        ownerSign: ownerSign,
+        tenantSign: tenantSign
       });
       emit Sealed(
         purpose,
         size,
         duration,
         cost,
-        _agreements[tenant].owner,
-        _agreements[tenant].tenant,
+        _agreements[msg.sender].owner,
+        _agreements[msg.sender].tenant,
         tokenId
       );
     }
@@ -316,6 +297,9 @@ contract PropertyUsage {
    * @param cost Agreed cost
    * @param tokenId Tokenized property title
    * @param signature Signature of the claimer
+   * @param v Parity of the y-co-ordinate of r
+   * @param r The x co-ordinate of r
+   * @param s The s value of the signature
    * @return (bool, uint256, uint256)
    */
   function claimUsageRights(
@@ -324,12 +308,15 @@ contract PropertyUsage {
           uint256 duration,
           uint256 cost,
           uint256 tokenId,
-          bytes memory signature
+          bytes memory signature,
+          uint8 v,
+          bytes32 r,
+          bytes32 s
   ) external view returns (bool, uint256, uint256) {
     //recreate claim message signed off-chain
     bytes32 message = recreateAgreementMessage(purpose, size, duration, cost, tokenId);
     // get signer
-    address claimer = whoIsSigner(message, signature);
+    address claimer = whoIsSigner(message, signature, v, r, s);
     Agreement storage _agreement = _agreements[claimer];
     return (
       ((block.timestamp < _agreement.duration) &&
@@ -353,8 +340,10 @@ contract PropertyUsage {
    * @param duration How long was the agreement to last?
    * @param cost How much did the agreement cost?
    * @param tokenId Tokenized property title
-   * @param claimerSign Signature of the claimer(property owner)
    * @param tenantSign Signature of the tenant
+   * @param v Parity of the y-co-ordinate of r
+   * @param r The x co-ordinate of r
+   * @param s The s value of the signature
    */
   function reclaimRights(
     string memory purpose,
@@ -362,20 +351,19 @@ contract PropertyUsage {
     uint256 duration,
     uint256 cost,
     uint256 tokenId,
-    bytes memory claimerSign,
-    bytes memory tenantSign
+    bytes memory tenantSign,
+    uint8 v,
+    bytes32 r,
+    bytes32 s
   ) external {
     // recreate claim message signed off-chain
     bytes32 message = recreateAgreementMessage(purpose, size, duration, cost, tokenId);
-    // get claimer
-    address claimer = whoIsSigner(message, claimerSign);
     // get tenant
-    address tenant = whoIsSigner(message, tenantSign);
+    address tenant = whoIsSigner(message, tenantSign, v, r, s);
     // get agreement
     Agreement storage agreement = _agreements[tenant];
     require(agreement.tenant == tenant, 'cannot authenticate tenant in agreement');
-    require(agreement.owner == claimer, 'cannot authenticate property owner in agreement');
-    require(claimer == msg.sender, 'cannot authenticate claimer');
+    require(agreement.owner == msg.sender, 'cannot authenticate property owner in agreement');
     require(agreement.duration < block.timestamp, 'agreement timeline not fullfiled');
     // reclaim rights from agreement back to property owner
     _rights[tokenId].rights = _rights[tokenId].rights.add(agreement.size);

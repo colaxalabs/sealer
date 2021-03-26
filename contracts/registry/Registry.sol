@@ -114,13 +114,19 @@ contract Registry {
    * @param tokenId Tokenized property title
    * @param documentHash Hash of the title document
    * @param size Size of the land(should match with data in title document)
+   * @param v Parity of the y-co-ordinate of r
+   * @param r The x co-ordinate of r
+   * @param s The s value of the signature
    * @param attestor Attestor signature
    */
   function attestProperty(
           uint256 tokenId,
           string memory documentHash,
           uint256 size,
-          bytes memory attestor
+          bytes memory attestor,
+          uint8 v,
+          bytes32 r,
+          bytes32 s
   ) external {
     require(!_nonce[keccak256(abi.encode(documentHash))], "REGISTRY: duplicate title document");
     _nonce[keccak256(abi.encode(documentHash))] = true;
@@ -128,9 +134,9 @@ contract Registry {
     // Recreate message signed off-chain by signer
     bytes32 message = recreateAttestationMessage(tokenId, documentHash, size);
     // Authenticate message
-    require(whoIsSigner(message, attestor) == msg.sender, "REGISTRY: cannot authenticate signer");
+    require(whoIsSigner(message, attestor, v, r, s) == msg.sender, "REGISTRY: cannot authenticate signer");
     // Recover signer of the message
-    address signer = whoIsSigner(message, attestor);
+    address signer = whoIsSigner(message, attestor, v, r, s);
     // Mint tokenId
     nftContract._safeMint(signer, tokenId);
     _totalLands += 1;
@@ -158,16 +164,27 @@ contract Registry {
    * @param docHash Property title document hash
    * @param size Property approximation area
    * @param signature Signature of the claimer
+   * @param v Parity of the y-co-ordinate of r
+   * @param r The x co-ordinate of r
+   * @param s The s value of the signature
    * return bool
    */
-  function claimOwnership(uint256 tokenId, string memory docHash, uint256 size, bytes memory signature) external view returns (bool) {
+  function claimOwnership(
+          uint256 tokenId,
+          string memory docHash,
+          uint256 size,
+          bytes memory signature,
+          uint8 v,
+          bytes32 r,
+          bytes32 s
+  ) external view returns (bool) {
     // recreate message signed off-chain by claimer
     bytes32 message = recreateAttestationMessage(tokenId, docHash, size);
     // authenticate claimer
-    require(whoIsSigner(message, signature) == msg.sender, 'cannot authenticate claimer');
+    require(whoIsSigner(message, signature, v, r, s) == msg.sender, 'cannot authenticate claimer');
     // get property details
     Land storage _land = _titleLand[tokenId];
-    return (whoIsSigner(message, signature) == _land.attestor);
+    return (whoIsSigner(message, signature, v, r, s) == _land.attestor);
   }
 
   /**
@@ -196,31 +213,14 @@ contract Registry {
 
   /**
    * @notice Split signer from signature
+   * @param message Hash of the message signed off-chain
+   * @param sig Signature from the above signed message
+   * @param v Parity of the y-co-ordinate of r
+   * @param r The x co-ordinate of r
+   * @param s The s value of the signature
    */
-  function whoIsSigner(bytes32 message, bytes memory sig) internal pure returns (address) {
-    bytes32 r;
-    bytes32 s;
-    uint8 v;
+  function whoIsSigner(bytes32 message, bytes memory sig, uint8 v, bytes32 r, bytes32 s) internal pure returns (address) {
     require(sig.length == 65, "REGISTRY: invalid signature to split");
-    // Split signature
-    assembly {
-      // first 32 bytes, after the length prefix
-      r := mload(add(sig, 32))
-      // second 32 bytes
-      s := mload(add(sig, 64))
-      // final byte (first byte of the next 32 bytes)
-      v := byte(0, mload(add(sig, 96)))
-    }
-
-    if (v < 27) {
-      v += 27;
-    }
-
-    if (v != 27 && v != 28) {
-      return address(0);
-    } else {
-      return ecrecover(message, v, r, s);
-    }
-
+    return ecrecover(message, v, r, s);
   }
 }
