@@ -83,7 +83,8 @@ describe('Registry:Agreement#sealAgreement', () => {
   before('setup Registry contract', async() => {
     await setupContract()
     const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor, v, r, s)
   })
 
   it('Should revert sealing agreement for nonexistent property', async() => {
@@ -146,66 +147,6 @@ describe('Registry:Agreement#sealAgreement', () => {
     ).to.be.reverted
   })
 
-  it('Should revert unauthenticated owner', async() => {
-    const ownerSign = await ownerSignsAgreement(
-      rentPurpose,
-      tenantSize,
-      rentDuration,
-      cost,
-      tokenId2,
-      accounts[2],
-    )
-    const tenantSign = await tenantSignsAgreement(
-      rentPurpose,
-      tenantSize,
-      rentDuration,
-      cost,
-      tokenId,
-      accounts[3],
-    )
-    await expect(
-      usage.sealAgreement(
-        rentPurpose,
-        tenantSize,
-        rentDuration,
-        cost,
-        tokenId,
-        ownerSign,
-        tenantSign
-      )
-    ).to.be.revertedWith('cannot authenticate owner')
-  })
-
-  it('Should revert unauthenticated tenant', async() => {
-    const ownerSign = await ownerSignsAgreement(
-      rentPurpose,
-      tenantSize,
-      rentDuration,
-      cost,
-      tokenId,
-      accounts[2],
-    )
-    const tenantSign = await tenantSignsAgreement(
-      rentPurpose,
-      tenantSize,
-      rentDuration,
-      cost,
-      tokenId2,
-      accounts[3],
-    )
-    await expect(
-      usage.sealAgreement(
-        rentPurpose,
-        tenantSize,
-        rentDuration,
-        cost,
-        tokenId,
-        ownerSign,
-        tenantSign
-      )
-    ).to.be.revertedWith('cannot authenticate tenant')
-  })
-
   it('Should revert if latest agreement is not fullfilled', async() => {
     const ownerSign = await ownerSignsAgreement(
       rentPurpose,
@@ -248,7 +189,8 @@ describe('Registry:Agreement#sealAgreement', () => {
   it('Should seal agreement correctly', async() => {
     await setupContract()
     const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor, v, r, s)
     const ownerSign = await ownerSignsAgreement(
       rentPurpose,
       tenantSize,
@@ -293,9 +235,11 @@ describe('Registry:Agreement#claimUsageRights', () => {
   before('setup Agreement contract', async() => {
     await setupContract()
     const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
     const signer2 = await signProperty(tokenId2, ipfsHash2, size, accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId,  ipfsHash, size, attestor)
-    await registry.connect(accounts[2]).attestProperty(tokenId2, ipfsHash2, size, signer2.attestor)
+    await registry.connect(accounts[2]).attestProperty(tokenId,  ipfsHash, size, attestor, v, r, s)
+    const vrs = ethers.utils.splitSignature(signer2.attestor)
+    await registry.connect(accounts[2]).attestProperty(tokenId2, ipfsHash2, size, signer2.attestor, vrs.v, vrs.r, vrs.s)
     const ownerSign = await ownerSignsAgreement(
       rentPurpose,
       tenantSize,
@@ -325,7 +269,8 @@ describe('Registry:Agreement#claimUsageRights', () => {
 
   it('Should return false claiming unauthorized usage on attested property title', async() => {
     const claimerSign = await signUsageClaim(rentPurpose, tenantSize, rentDuration, cost, tokenId, accounts[4])
-    const resp = await usage.claimUsageRights(rentPurpose, tenantSize, rentDuration, cost, tokenId, claimerSign)
+    const { v, r, s } = ethers.utils.splitSignature(claimerSign)
+    const resp = await usage.claimUsageRights(rentPurpose, tenantSize, rentDuration, cost, tokenId, claimerSign, v, r, s)
     expect(resp.length).to.eq(3)
     expect(resp[0]).to.be.false
     expect(resp[1].toNumber()).to.eq(zero)
@@ -334,7 +279,8 @@ describe('Registry:Agreement#claimUsageRights', () => {
 
   it('Should claim usage rights correctly', async() => {
     const claimerSign = await signUsageClaim(rentPurpose, tenantSize, rentDuration, cost, tokenId, accounts[3])
-    const resp = await usage.claimUsageRights(rentPurpose, tenantSize, rentDuration, cost, tokenId, claimerSign)
+    const { v, r, s } = ethers.utils.splitSignature(claimerSign)
+    const resp = await usage.claimUsageRights(rentPurpose, tenantSize, rentDuration, cost, tokenId, claimerSign, v, r, s)
     expect(resp.length).to.eq(3)
     expect(resp[0]).to.be.true
     expect(resp[1].toNumber()).to.eq(rentDuration)
@@ -346,7 +292,8 @@ describe('Agreement#getRights', () => {
   before('setup Agreement contract', async() => {
     await setupContract()
     const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor, v, r, s)
   })
 
   it('Should revert getting rights for non-claimed property rights', async() => {
@@ -393,7 +340,8 @@ describe('Agreement#reclaimRights', () => {
   before('setup Agreement contract', async() => {
     await setupContract()
     const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor, v, r, s)
     ownerSign = await ownerSignsAgreement(
       rentPurpose,
       tenantSize,
@@ -430,6 +378,7 @@ describe('Agreement#reclaimRights', () => {
       tokenId,
       accounts[4],
     )
+    const { v, r, s } = ethers.utils.splitSignature(tenantSign2)
     await expect(
       usage.connect(accounts[2]).reclaimRights(
         rentPurpose,
@@ -437,8 +386,10 @@ describe('Agreement#reclaimRights', () => {
         rentDuration,
         cost,
         tokenId,
-        ownerSign,
-        tenantSign2
+        tenantSign2,
+        v,
+        r,
+        s
       )
     ).to.be.revertedWith('cannot authenticate tenant in agreement')
   })
@@ -452,20 +403,7 @@ describe('Agreement#reclaimRights', () => {
       tokenId,
       accounts[3],
     )
-    await expect(
-      usage.connect(accounts[2]).reclaimRights(
-        rentPurpose,
-        tenantSize,
-        rentDuration,
-        cost,
-        tokenId,
-        ownerSign2,
-        tenantSign
-      )
-    ).to.be.revertedWith('cannot authenticate property owner in agreement')
-  })
-
-  it('Should revert when method caller for reclaiming rights is not property owner', async() => {
+    const { v, r, s } = ethers.utils.splitSignature(tenantSign)
     await expect(
       usage.connect(accounts[3]).reclaimRights(
         rentPurpose,
@@ -473,13 +411,16 @@ describe('Agreement#reclaimRights', () => {
         rentDuration,
         cost,
         tokenId,
-        ownerSign,
-        tenantSign
+        tenantSign,
+        v,
+        r,
+        s
       )
-    ).to.be.revertedWith('cannot authenticate claimer')
+    ).to.be.revertedWith('cannot authenticate property owner in agreement')
   })
 
   it('Should revert when agreement timeline has not elapsed', async() => {
+    const { v, r, s } = ethers.utils.splitSignature(tenantSign)
     await expect(
       usage.connect(accounts[2]).reclaimRights(
         rentPurpose,
@@ -487,14 +428,17 @@ describe('Agreement#reclaimRights', () => {
         rentDuration,
         cost,
         tokenId,
-        ownerSign,
-        tenantSign
+        tenantSign,
+        v,
+        r,
+        s
       )
     ).to.be.revertedWith('agreement timeline not fullfiled')
   })
 
   it('Should reclaim property rights correctly after agreement timelapse', async() => {
     await increaseTime(futureDate)
+    const { v, r, s } = ethers.utils.splitSignature(tenantSign)
     await expect(
       usage.connect(accounts[2]).reclaimRights(
         rentPurpose,
@@ -502,8 +446,10 @@ describe('Agreement#reclaimRights', () => {
         rentDuration,
         cost,
         tokenId,
-        ownerSign,
-        tenantSign
+        tenantSign,
+        v,
+        r,
+        s
       )
     ).to.emit(usage, 'Reclaimed').withArgs(tokenId, size, true)
     expect(await usage.userAgreements(await accounts[3].getAddress())).to.eq(ethers.BigNumber.from(1))
@@ -527,7 +473,8 @@ describe('Agreement#propertyAgreementAt#propertyAgreements#userAgreements#userAg
     await setupContract()
     who = await accounts[3].getAddress()
     const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor, v, r, s)
     ownerSign = await ownerSignsAgreement(
       rentPurpose,
       tenantSize,
@@ -553,14 +500,17 @@ describe('Agreement#propertyAgreementAt#propertyAgreements#userAgreements#userAg
       ownerSign,
       tenantSign
     )
+    const vrs = ethers.utils.splitSignature(tenantSign)
     await usage.connect(accounts[2]).reclaimRights(
       rentPurpose,
       tenantSize,
       rentDuration,
       cost,
       tokenId,
-      ownerSign,
-      tenantSign
+      tenantSign,
+      vrs.v,
+      vrs.r,
+      vrs.s
     )
   })
 
@@ -605,7 +555,8 @@ describe('Agreement#getTransferredRights', () => {
     await setupContract()
     who = await accounts[3].getAddress()
     const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor, v, r, s)
     ownerSign = await ownerSignsAgreement(
       rentPurpose,
       tenantSize,
@@ -632,14 +583,17 @@ describe('Agreement#getTransferredRights', () => {
       tenantSign
     )
     initialRights = await usage.getTransferredRights(tokenId)
+    const vrs = ethers.utils.splitSignature(tenantSign)
     await usage.connect(accounts[2]).reclaimRights(
       rentPurpose,
       tenantSize,
       rentDuration,
       cost,
       tokenId,
-      ownerSign,
-      tenantSign
+      tenantSign,
+      vrs.v,
+      vrs.r,
+      vrs.s
     )
   })
 

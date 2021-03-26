@@ -59,12 +59,16 @@ describe('Registry:Attest Property', () => {
 
   it('Should attest title property and emit Attestation event', async() => {
     const { attestor, signer } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
     await expect(
       registry.connect(accounts[2]).attestProperty(
         tokenId,
         ipfsHash,
         size,
-        attestor
+        attestor,
+        v,
+        r,
+        s
       )
     ).to.emit(
       registry,
@@ -79,36 +83,48 @@ describe('Registry:Attest Property', () => {
 
   it('Should not attest duplicate property', async() => {
     const { attestor, signer } = await signProperty(tokenId, ipfsHash, size, accounts[2])
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
     await expect(
       registry.connect(accounts[2]).attestProperty(
         tokenId,
         ipfsHash,
         size,
-        attestor
+        attestor,
+        v,
+        r,
+        s
       )
     ).to.be.revertedWith('REGISTRY: duplicate title document')
   })
 
   it('Should not attest duplicate property tokenId', async() => {
     const { attestor, signer } = await signProperty(tokenId, ipfsHash2, size, accounts[2])
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
     await expect(
       registry.connect(accounts[2]).attestProperty(
         tokenId,
         ipfsHash2,
         size,
-        attestor
+        attestor,
+        v,
+        r,
+        s
       )
     ).to.be.revertedWith('ERC721: token already minted')
   })
 
   it('Should not attest invalid property data signed', async() => {
     const { attestor } = await signProperty(tokenId, ipfsHash2, size, accounts[2])
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
     await expect(
       registry.connect(accounts[2]).attestProperty(
         tokenId2,
         ipfsHash2,
         size,
-        attestor
+        attestor,
+        v,
+        r,
+        s
       )
     ).to.be.revertedWith('REGISTRY: cannot authenticate signer')
   })
@@ -119,17 +135,20 @@ describe('Registry:Claim Ownership', () => {
   before('setup Registry contract', async() => {
     await setupContract()
     const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor, v, r, s)
   })
 
   it('Should attest ownership to property', async() => {
     const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
-    expect(await registry.connect(accounts[2]).claimOwnership(tokenId, ipfsHash, size, attestor)).to.be.true
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
+    expect(await registry.connect(accounts[2]).claimOwnership(tokenId, ipfsHash, size, attestor, v, r, s)).to.be.true
   })
 
   it('Should panic attest with wrong signer', async() => {
     const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
-    await expect(registry.connect(accounts[3]).claimOwnership(tokenId, ipfsHash, size, attestor)).to.be.revertedWith("cannot authenticate claimer")
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
+    await expect(registry.connect(accounts[3]).claimOwnership(tokenId, ipfsHash, size, attestor, v, r, s)).to.be.revertedWith("cannot authenticate claimer")
   })
 })
 
@@ -137,7 +156,8 @@ describe('Registry#accountProperty', () => {
   before('setup Registry contract', async() => {
     await setupContract()
     const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor, v, r, s)
   })
 
   it('Should panic getting total properties for zero address', async() => {
@@ -180,7 +200,8 @@ describe('Registry#getProperty', () => {
   before('setup Registry contract', async() => {
     await setupContract()
     const { attestor } = await signProperty(tokenId, ipfsHash, size, accounts[2])
-    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor)
+    const { v, r, s } = ethers.utils.splitSignature(attestor)
+    await registry.connect(accounts[2]).attestProperty(tokenId, ipfsHash, size, attestor, v, r, s)
   })
 
   it('Should return property for non-tokenized id', async() => {
