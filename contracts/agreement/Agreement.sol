@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity >=0.6.0 <0.8.0;
 
 import "../registry/Registry.sol";
-import "../lib/SafeMath.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "../token/ERC721.sol";
 import "hardhat/console.sol";
 
@@ -68,7 +68,7 @@ contract PropertyUsage {
   /**
    * @dev Init contract
    */
-  constructor(address registryAddress, address tokenAddress) {
+  constructor(address registryAddress, address tokenAddress) public {
     // load Registry contract
     registry = Registry(registryAddress);
     // load ERC721 contract
@@ -100,7 +100,7 @@ contract PropertyUsage {
   * @dev Return property agreement at an index
   * @param tokenId Tokenized property title
   * @param index Index of the agreement
-  * @return (string, uint256, uint256, uint256, address, address, uint256, bool)
+  * @return (string memory, uint256, uint256, uint256, address, address, uint256, bool)
   */
  function propertyAgreementAt(uint256 tokenId, uint256 index)
     external
@@ -145,7 +145,7 @@ contract PropertyUsage {
    * @dev Get account agreement at a certain index
    * @param who Address of an account
    * @param index Index in previous agreements mappings
-   * @return (string, uint256, uint256, uint256, address, address, uint256, bool)
+   * @return (string memory, uint256, uint256, uint256, address, address, uint256, bool)
    */
   function userAgreementAt(address who, uint256 index)
     external
@@ -241,13 +241,13 @@ contract PropertyUsage {
    * @param tenantSign Signature to verify signer
    */
     function sealAgreement(
-      string memory purpose,
+      string calldata purpose,
       uint256 size,
       uint256 duration,
       uint256 cost,
       uint256 tokenId,
-      bytes memory ownerSign,
-      bytes memory tenantSign
+      bytes calldata ownerSign,
+      bytes calldata tenantSign
     ) external {
       require(registry.titleSize(tokenId) != 0);
       require(size <= registry.titleSize(tokenId));
@@ -303,12 +303,12 @@ contract PropertyUsage {
    * @return (bool, uint256, uint256)
    */
   function claimUsageRights(
-          string memory purpose,
+          string calldata purpose,
           uint256 size,
           uint256 duration,
           uint256 cost,
           uint256 tokenId,
-          bytes memory signature,
+          bytes calldata signature,
           uint8 v,
           bytes32 r,
           bytes32 s
@@ -346,12 +346,12 @@ contract PropertyUsage {
    * @param s The s value of the signature
    */
   function reclaimRights(
-    string memory purpose,
+    string calldata purpose,
     uint256 size,
     uint256 duration,
     uint256 cost,
     uint256 tokenId,
-    bytes memory tenantSign,
+    bytes calldata tenantSign,
     uint8 v,
     bytes32 r,
     bytes32 s

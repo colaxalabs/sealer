@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity >=0.6.0 <0.8.0;
 
 import "../interfaces/IERC721.sol";
 import "../interfaces/IERC721Receiver.sol";
 import "../introspection/ERC165.sol";
-import "../utils/Address.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 contract ERC721 is ERC165, IERC721 {
   using Address for address;
@@ -15,14 +15,6 @@ contract ERC721 is ERC165, IERC721 {
   mapping(address => uint256) private _balances;
   // Mapping token to their holder
   mapping(uint256 => address) private _tokenToHolder;
-
-  /**
-   * @dev Initalizes the contract by registering supported interfaces
-   */
-  constructor() {
-    // _register supported interfaces to conform to ERC721 via ERC165
-    _registerInterface(type(IERC721).interfaceId);
-  }
 
   /**
    * @dev See {IERC721-balanceOf}
@@ -83,7 +75,7 @@ contract ERC721 is ERC165, IERC721 {
   /**
    * @dev See {IERC721-safeTransferFrom}
    */
-  function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory _data) external override {}
+  function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata _data) external override {}
 
   /**
    * @dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients

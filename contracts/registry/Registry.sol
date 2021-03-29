@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity >=0.6.0 <0.8.0;
 
 import "../token/ERC721.sol";
-import "hardhat/console.sol";
+import "@opengsn/gsn/contracts/BaseRelayRecipient.sol";
 
-contract Registry {
+contract Registry is BaseRelayRecipient {
 
   // @dev Emit Attestation after successful registration
   event Attestation(
@@ -37,9 +37,14 @@ contract Registry {
   /**
    * @dev Init contract
    */
-  constructor(address nftAddress) {
+  constructor(address nftAddress, address _forwarder) public {
     // load nft contract
+    trustedForwarder = _forwarder;
     nftContract = ERC721(nftAddress);
+  }
+
+  function versionRecipient() external override view returns (string memory) {
+      return "1.0.1";
   }
 
   /**
@@ -121,9 +126,9 @@ contract Registry {
    */
   function attestProperty(
           uint256 tokenId,
-          string memory documentHash,
+          string calldata documentHash,
           uint256 size,
-          bytes memory attestor,
+          bytes calldata attestor,
           uint8 v,
           bytes32 r,
           bytes32 s
@@ -134,7 +139,7 @@ contract Registry {
     // Recreate message signed off-chain by signer
     bytes32 message = recreateAttestationMessage(tokenId, documentHash, size);
     // Authenticate message
-    require(whoIsSigner(message, attestor, v, r, s) == msg.sender, "REGISTRY: cannot authenticate signer");
+    require(whoIsSigner(message, attestor, v, r, s) == _msgSender(), "REGISTRY: cannot authenticate signer");
     // Recover signer of the message
     address signer = whoIsSigner(message, attestor, v, r, s);
     // Mint tokenId
@@ -171,9 +176,9 @@ contract Registry {
    */
   function claimOwnership(
           uint256 tokenId,
-          string memory docHash,
+          string calldata docHash,
           uint256 size,
-          bytes memory signature,
+          bytes calldata signature,
           uint8 v,
           bytes32 r,
           bytes32 s
@@ -181,7 +186,7 @@ contract Registry {
     // recreate message signed off-chain by claimer
     bytes32 message = recreateAttestationMessage(tokenId, docHash, size);
     // authenticate claimer
-    require(whoIsSigner(message, signature, v, r, s) == msg.sender, 'cannot authenticate claimer');
+    require(whoIsSigner(message, signature, v, r, s) == _msgSender(), 'cannot authenticate claimer');
     // get property details
     Land storage _land = _titleLand[tokenId];
     return (whoIsSigner(message, signature, v, r, s) == _land.attestor);
