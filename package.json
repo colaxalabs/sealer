@@ -4,8 +4,8 @@
     "description": "Attest property ownership",
     "main": "index.js",
     "scripts": {
-        "testg": "npx hardhat --network ganache test test/unit/Registry.ts",
-        "test": "run-with-testrpc --chainId 1337 'npx hardhat test test/unit/Registry.ts'",
+        "testg-with-gsn": "npx hardhat --network ganache test test/unit/Registry.ts",
+        "test-with-gsn": "run-with-testrpc --chainId 1337 'npx hardhat test test/unit/Registry.ts'",
         "ganache-with-gsn": "run-with-testrpc --chainId 1337 'gsn start'"
     },
     "repository": {
