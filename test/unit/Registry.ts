@@ -15,7 +15,12 @@ const title2 = "111/v0/43x/4932";
 const abiCoder = ethers.utils.defaultAbiCoder;
 const size = ethers.utils.parseUnits("0.35", 18);
 
-let accounts: Signer[], registry: Contract, token: Contract;
+let accounts: Signer[],
+  registry: Contract,
+  token: Contract,
+  registryWithGsn: Contract,
+  from: any,
+  newRegistryWithGsn: Contract;
 
 async function setupContract() {
   // get signers
