@@ -260,3 +260,57 @@ describe("Registry#getProperty", () => {
     expect(resp[3]).to.eq(await accounts[2].getAddress());
   });
 });
+
+describe("Registry#accumulatedRights", () => {
+  before("setup Registry contract", async () => {
+    await setupContract();
+    const { attestor } = await signProperty(
+      tokenId,
+      ipfsHash,
+      size,
+      accounts[2]
+    );
+    const { v, r, s } = ethers.utils.splitSignature(attestor);
+    await registry
+      .connect(accounts[2])
+      .attestProperty(tokenId, ipfsHash, size, attestor, v, r, s);
+  });
+
+  it("Should revert getting accumulated rights for zero address", async () => {
+    await expect(registry.accumulatedRights(addressZero)).to.be.reverted;
+  });
+
+  it("Should return zero accumulated rights for account with no tokenized property", async () => {
+    const who = accounts[4].getAddress();
+    const resp = await registry.accumulatedRights(who);
+    expect(resp).to.eq(ethers.BigNumber.from(0));
+  });
+
+  it("Should return accumulated rights for an account", async () => {
+    const who = await accounts[2].getAddress();
+    const resp = await registry.accumulatedRights(who);
+    expect(resp).to.eq(ethers.BigNumber.from(size));
+  });
+});
+
+describe("Registry#allAccumulatedRights", () => {
+  before("setup Registry contract", async () => {
+    await setupContract();
+    const { attestor } = await signProperty(
+      tokenId,
+      ipfsHash,
+      size,
+      accounts[2]
+    );
+    const { v, r, s } = ethers.utils.splitSignature(attestor);
+    await registry
+      .connect(accounts[2])
+      .attestProperty(tokenId, ipfsHash, size, attestor, v, r, s);
+  });
+
+  it("Should return all accumulated and tokenized rights", async () => {
+    expect(await registry.allAccumulatedRights()).to.eq(
+      ethers.BigNumber.from(size)
+    );
+  });
+});
