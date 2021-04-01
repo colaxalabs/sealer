@@ -3,9 +3,12 @@
 pragma solidity >=0.6.0 <0.8.0;
 
 import "../token/ERC721.sol";
+import '@openzeppelin/contracts/math/SafeMath.sol';
 import "@opengsn/gsn/contracts/BaseRelayRecipient.sol";
 
 contract Registry is BaseRelayRecipient {
+
+    using SafeMath for uint256;
 
   // @dev Emit Attestation after successful registration
   event Attestation(
@@ -33,6 +36,9 @@ contract Registry is BaseRelayRecipient {
   mapping(uint256 => Land) private _titleLand;
   // Mapping account to its properties(ownership) user -> index -> property
   mapping(address => mapping(uint256 => Land)) private _accountProperties;
+  // Accumulated rights
+  mapping(address => uint256) private _accumulatedRights; // for an account
+  uint256 private _totalAccumulatedRights; // all accumulated rights
 
   /**
    * @dev Init contract
@@ -89,6 +95,26 @@ contract Registry is BaseRelayRecipient {
    */
   function titleSize(uint256 tokenId) external view returns (uint256) {
     return _titleLand[tokenId].size;
+  }
+
+  /**
+    * @notice Account accumulated rights
+    * @dev Return total accumulated rights for an account
+    * @param who Account address
+    * @return uint256
+    */
+  function accumulatedRights(address who) external view returns (uint256) {
+      require(who != address(0));
+      return _accumulatedRights[who];
+  }
+
+  /**
+    * @notice Accumulated rights
+    * @dev Return all accumulated rights
+    * @return uint256
+    */
+  function allAccumulatedRights() external view returns (uint256) {
+      return _totalAccumulatedRights;
   }
 
   /**
@@ -152,6 +178,9 @@ contract Registry is BaseRelayRecipient {
       size: size,
       attestor: signer
     });
+    // Account accumulated rights
+    _accumulatedRights[signer] = _accumulatedRights[signer].add(size);
+    _totalAccumulatedRights = _totalAccumulatedRights.add(size);
     // Record property to user attestor
     _accountProperties[signer][nftContract.balanceOf(signer)] = _titleLand[tokenId];
     emit Attestation(
